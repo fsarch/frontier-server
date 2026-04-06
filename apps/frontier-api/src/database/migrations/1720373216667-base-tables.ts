@@ -49,7 +49,7 @@ export class BaseTables1720373216667 implements MigrationInterface {
             name: 'id',
             type: 'uuid',
             isPrimary: true,
-            primaryKeyConstraintName: 'pk_domain_group',
+            primaryKeyConstraintName: 'pk_domain_group_domain',
           },
           {
             name: 'domain_group_id',

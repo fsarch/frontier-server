@@ -46,7 +46,7 @@ export class CachePolicy {
   @Column({
     name: 'divergence_headers',
     array: true,
-    type: 'string',
+    type: 'varchar',
     nullable: true,
   })
   divergenceHeaders: Array<string>;
@@ -54,7 +54,7 @@ export class CachePolicy {
   @Column({
     name: 'divergence_cookies',
     array: true,
-    type: 'string',
+    type: 'varchar',
     nullable: true,
   })
   divergenceCookies: Array<string>;
@@ -62,7 +62,7 @@ export class CachePolicy {
   @Column({
     name: 'divergence_query_parameters',
     array: true,
-    type: 'string',
+    type: 'varchar',
     nullable: true,
   })
   divergenceQueryParameters: Array<string>;

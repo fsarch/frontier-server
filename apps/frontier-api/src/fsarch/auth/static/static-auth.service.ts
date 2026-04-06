@@ -1,11 +1,10 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { IAuthService } from '../types/auth-service.type.js';
 import { JwtService } from '@nestjs/jwt';
-import {
-  ConfigStaticAuthType,
-} from '../../configuration/config.type.js';
+import { ConfigStaticAuthType } from '../../configuration/config.type.js';
 import { ModuleConfigurationService } from '../../configuration/module/module-configuration.service.js';
-import { Request } from "express";
+import { Request } from 'express';
+import { User } from '../user.js';
 
 @Injectable()
 export class StaticAuthService implements IAuthService {
@@ -20,7 +19,7 @@ export class StaticAuthService implements IAuthService {
     return type === 'Bearer' ? token : undefined;
   }
 
-  async validateRequest(request: any): Promise<boolean> {
+  async validateRequest(request: any): Promise<User> {
     const token = this.extractTokenFromHeader(request);
     if (!token) {
       console.debug('could not get token from header');
@@ -32,12 +31,15 @@ export class StaticAuthService implements IAuthService {
       request['user'] = {
         id: payload.sub,
       };
-    } catch(error) {
+    } catch (error) {
       console.debug('could not verify jwt', error);
 
       throw new UnauthorizedException(error);
     }
-    return true;
+
+    return new User({
+      accessToken: token,
+    });
   }
 
   async signIn(

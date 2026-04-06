@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { JwtJwkAuthService } from './jwt-jwk-auth.service.js';
+import { OidcAuthService } from './oidc-auth.service.js';
 import { ModuleConfiguration } from '../../configuration/module/module-configuration.module.js';
 
 @Module({
@@ -8,7 +8,7 @@ import { ModuleConfiguration } from '../../configuration/module/module-configura
       name: 'auth',
     }),
   ],
-  providers: [JwtJwkAuthService],
-  exports: [JwtJwkAuthService],
+  providers: [OidcAuthService],
+  exports: [OidcAuthService],
 })
-export class JwtJwkAuthModule {}
+export class OidcAuthModule {}

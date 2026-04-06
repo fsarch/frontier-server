@@ -1,3 +1,3 @@
 export enum Role {
-  manage = 'manage'
+  manage = 'manage',
 }

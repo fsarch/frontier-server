@@ -1,8 +1,8 @@
-import { Module } from "@nestjs/common";
+import { Module } from '@nestjs/common';
 import { StaticAuthService } from './static-auth.service.js';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { ModuleConfiguration } from "../../configuration/module/module-configuration.module.js";
+import { ModuleConfiguration } from '../../configuration/module/module-configuration.module.js';
 
 @Module({
   imports: [

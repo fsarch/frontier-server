@@ -6,7 +6,7 @@ export const SQLITE_DATABASE_CONFIG_VALIDATOR = Joi.object({
 });
 
 export const COCKROACH_DATABASE_CONFIG_VALIDATOR = Joi.object({
-  type: Joi.string().valid('cockroachdb').required(),
+  type: Joi.string().valid('cockroachdb', 'postgres').required(),
   host: Joi.string().required(),
   username: Joi.string().required(),
   password: Joi.string(),

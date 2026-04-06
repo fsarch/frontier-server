@@ -4,7 +4,7 @@ export type ConfigType = {
   database: ConfigDatabaseType;
 };
 
-export type ConfigAuthType = ConfigStaticAuthType | ConfigJwtJwkAuthType;
+export type ConfigAuthType = ConfigStaticAuthType | ConfigJwtJwkAuthType | ConfigOidcAuthType;
 
 export type ConfigStaticAuthType = {
   type: 'static';
@@ -15,6 +15,11 @@ export type ConfigStaticAuthType = {
 export type ConfigJwtJwkAuthType = {
   type: 'jwt-jwk';
   jwkUrl: string;
+};
+
+export type ConfigOidcAuthType = {
+  type: 'oidc';
+  discovery_url: string;
 };
 
 type ConfigAuthUserType = {
@@ -45,7 +50,7 @@ type ConfigSqliteDatabaseType = {
 };
 
 type ConfigCockroachdbDatabaseType = {
-  type: 'cockroachdb';
+  type: 'cockroachdb' | 'postgres';
   host: string;
   username: string;
   password?: string;

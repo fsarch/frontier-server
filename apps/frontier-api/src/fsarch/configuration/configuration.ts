@@ -6,8 +6,9 @@ import { ConfigType } from './config.type.js';
 
 const YAML_CONFIG_FILENAME = 'config.yaml';
 
-const CONFIG_VALIDATION_SCHEMA = Joi.any(
-  // {
+const CONFIG_VALIDATION_SCHEMA = Joi
+  .any
+  //{
   // auth: Joi.alternatives(
   //   Joi.object({
   //     type: Joi.string().valid('static').required(),
@@ -70,7 +71,7 @@ const CONFIG_VALIDATION_SCHEMA = Joi.any(
   //   }),
   // ),
   // }
-);
+  ();
 
 export default () => {
   const config = yaml.load(
