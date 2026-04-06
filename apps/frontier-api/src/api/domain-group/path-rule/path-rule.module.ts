@@ -6,6 +6,7 @@ import { PathRule } from "../../../database/entities/path-rule.entity";
 
 @Module({
   providers: [PathRuleService],
+  exports: [PathRuleService],
   controllers: [PathRuleController],
   imports: [
     TypeOrmModule.forFeature([PathRule]),

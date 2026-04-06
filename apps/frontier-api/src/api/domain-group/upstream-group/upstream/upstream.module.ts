@@ -6,6 +6,7 @@ import { Upstream } from "../../../../database/entities/upstream.entity";
 
 @Module({
   providers: [UpstreamService],
+  exports: [UpstreamService],
   controllers: [UpstreamController],
   imports: [
     TypeOrmModule.forFeature([Upstream]),

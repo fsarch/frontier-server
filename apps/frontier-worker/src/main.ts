@@ -1,5 +1,11 @@
+import { WebSocketClient } from "./utils/websocket-client.utils";
+
+const webSocketClient = new WebSocketClient();
+
 async function bootstrap() {
-  console.log('start worker');
+  const res = await webSocketClient.sendWithReply('bootstrap', null);
+
+  console.log('start worker', res);
 }
 
 bootstrap();

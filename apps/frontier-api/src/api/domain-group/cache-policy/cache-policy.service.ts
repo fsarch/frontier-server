@@ -38,6 +38,10 @@ export class CachePolicyService {
     });
   }
 
+  public async List() {
+    return this.cachePolicyRepository.find();
+  }
+
   public async Update(
     id: string,
     domainGroupId: string,

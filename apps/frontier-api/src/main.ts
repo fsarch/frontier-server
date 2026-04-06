@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { VersioningType } from "@nestjs/common";
 import { FrontierApiModule } from "./frontier-api.module";
+import { WsAdapter } from '@nestjs/platform-ws';
 
 async function bootstrap() {
   const app = await NestFactory.create(FrontierApiModule);
@@ -20,6 +21,8 @@ async function bootstrap() {
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, documentFactory);
+
+  app.useWebSocketAdapter(new WsAdapter(app));
 
   await app.listen(process.env.PORT ?? 3000);
 }

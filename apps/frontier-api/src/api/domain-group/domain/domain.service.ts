@@ -36,4 +36,8 @@ export class DomainService {
       where: { domainGroupId },
     });
   }
+
+  public async List() {
+    return this.domainGroupDomainRepository.find();
+  }
 }

@@ -38,4 +38,8 @@ export class UpstreamGroupService {
       where: { domainGroupId },
     });
   }
+
+  public async List() {
+    return this.upstreamGroupRepository.find();
+  }
 }

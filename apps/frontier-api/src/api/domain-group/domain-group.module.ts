@@ -10,6 +10,7 @@ import { UpstreamGroupModule } from './upstream-group/upstream-group.module';
 
 @Module({
   providers: [DomainGroupService],
+  exports: [DomainGroupService],
   controllers: [DomainGroupController],
   imports: [
     DomainModule,

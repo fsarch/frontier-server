@@ -7,6 +7,7 @@ import { UpstreamModule } from './upstream/upstream.module';
 
 @Module({
   providers: [UpstreamGroupService],
+  exports: [UpstreamGroupService],
   controllers: [UpstreamGroupController],
   imports: [
     TypeOrmModule.forFeature([UpstreamGroup]),

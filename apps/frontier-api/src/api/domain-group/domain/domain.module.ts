@@ -6,6 +6,7 @@ import { DomainGroupDomain } from "../../../database/entities/domain-group-domai
 
 @Module({
   providers: [DomainService],
+  exports: [DomainService],
   controllers: [DomainController],
   imports: [
     TypeOrmModule.forFeature([DomainGroupDomain]),

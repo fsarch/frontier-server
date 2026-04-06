@@ -37,4 +37,8 @@ export class UpstreamService {
       where: { upstreamGroupId },
     });
   }
+
+  public async List() {
+    return this.upstreamRepository.find();
+  }
 }

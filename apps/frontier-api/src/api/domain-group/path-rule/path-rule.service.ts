@@ -40,4 +40,12 @@ export class PathRuleService {
       },
     });
   }
+
+  public async List() {
+    return this.pathRuleRepository.find({
+      order: {
+        order: "ASC",
+      },
+    });
+  }
 }

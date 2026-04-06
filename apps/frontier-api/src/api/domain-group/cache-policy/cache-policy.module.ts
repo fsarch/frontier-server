@@ -6,6 +6,7 @@ import { CachePolicy } from "../../../database/entities/cache-policy.entity";
 
 @Module({
   providers: [CachePolicyService],
+  exports: [CachePolicyService],
   controllers: [CachePolicyController],
   imports: [TypeOrmModule.forFeature([CachePolicy])],
 })
