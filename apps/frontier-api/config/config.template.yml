@@ -20,6 +20,11 @@ database:
     ca:
       path: ./config/certs/ca.crt
 
+workers:
+  websocket:
+    auth_token: 'change-me'
+    config_check_interval_ms: 2000
+
 remote-events:
   type: static
   hosts:

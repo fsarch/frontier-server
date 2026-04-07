@@ -27,6 +27,7 @@ RUN npm --workspace apps/frontier-worker run build
 FROM node:24.14.1-trixie-slim AS runner
 
 ENV NODE_ENV=production
+ENV FRONTIER_WORKER_PORT=8080
 
 WORKDIR /usr/src/app
 
@@ -39,6 +40,8 @@ RUN npm ci --omit=dev --fetch-timeout=300000 --workspace apps/frontier-worker --
 COPY --from=builder /usr/src/app/apps/frontier-worker/dist ./apps/frontier-worker/dist
 
 WORKDIR /usr/src/app/apps/frontier-worker
+
+EXPOSE 8080
 
 CMD ["node", "dist/main"]
 

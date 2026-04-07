@@ -17,6 +17,25 @@ Current default websocket target in source code:
 
 - `ws://localhost:3000/api/workers/websocket`
 
+The worker runtime follows a split control/data-plane approach:
+
+- Control plane (`WebSocket`): auth, bootstrap, config snapshots, heartbeat
+- Data plane (`HTTP`): incoming traffic proxying and request forwarding
+
+## Worker Environment
+
+- `FRONTIER_WORKER_PORT` (default `8080`) - data-plane HTTP ingress
+- `FRONTIER_CONTROL_PLANE_URL` (default `ws://localhost:3000/api/workers/websocket`)
+- `FRONTIER_WORKER_AUTH_TOKEN` (default `Test`)
+- `FRONTIER_WORKER_HEARTBEAT_MS` (default `10000`)
+
+## Control Plane Events (MVP)
+
+- Worker -> API: `auth`, `bootstrap`, `heartbeat`
+- API -> Worker: `bootstrap` reply (`version`, `checksum`, `snapshot`), push event `CONFIG_SNAPSHOT`
+
+The worker applies each new snapshot atomically and immediately serves new routes.
+
 ## Run Locally
 
 From repository root:
@@ -24,7 +43,15 @@ From repository root:
 ```bash
 npm install
 npm --workspace apps/frontier-worker run start:dev
+npm --workspace apps/frontier-worker run start:local
 ```
+
+`start:local` sets local defaults for:
+
+- `FRONTIER_WORKER_PORT=8080`
+- `FRONTIER_CONTROL_PLANE_URL=ws://localhost:3000/api/workers/websocket`
+- `FRONTIER_WORKER_AUTH_TOKEN=Test`
+- `FRONTIER_WORKER_HEARTBEAT_MS=10000`
 
 ## Docker Image
 
