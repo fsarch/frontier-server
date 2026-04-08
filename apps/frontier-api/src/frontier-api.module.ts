@@ -13,22 +13,6 @@ import { ApiModule } from './api/api.module';
 
 @Module({
   imports: [
-    FsarchModule.register({
-      auth: {},
-      database: {
-        entities: [
-          CachePolicy,
-          DomainGroup,
-          DomainGroupDomain,
-          PathRule,
-          Upstream,
-          UpstreamGroup,
-        ],
-        migrations: [
-          BaseTables1720373216667,
-        ],
-      },
-    }),
     ApiModule,
   ],
   controllers: [FrontierApiController],

@@ -1,26 +1,21 @@
-import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
-import { VersioningType } from "@nestjs/common";
 import { FrontierApiModule } from "./frontier-api.module";
 import { WsAdapter } from '@nestjs/platform-ws';
+import { FsArchAppBuilder } from "./fsarch/FsArchApp";
+import { DATABASE_OPTIONS } from "./database";
 
 async function bootstrap() {
-  const app = await NestFactory.create(FrontierApiModule);
-
-  app.enableCors();
-
-  app.enableVersioning({
-    type: VersioningType.URI,
-  });
-
-  const config = new DocumentBuilder()
-    .setTitle('Frontier-API-Server')
-    .setDescription('The Frontier API-Server is a utility service for configuring and managing the frontier-workers')
-    .addBearerAuth()
-    .setVersion('1.0')
+  const app = await new FsArchAppBuilder(FrontierApiModule, {
+    name: 'Frontier-API-Server',
+    version: '1.0.0',
+  })
+    .addSwagger({
+      title: 'Frontier-API-Server',
+      description: 'The Frontier API-Server is a utility service for configuring and managing the frontier-workers',
+      version: '1.0',
+    })
+    .enableAuth()
+    .setDatabase(DATABASE_OPTIONS)
     .build();
-  const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, documentFactory);
 
   app.useWebSocketAdapter(new WsAdapter(app));
 
