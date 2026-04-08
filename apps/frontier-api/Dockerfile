@@ -27,7 +27,7 @@ RUN npm --workspace apps/frontier-api run build
 FROM node:24.14.1-trixie-slim AS runner
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=8080
 
 WORKDIR /usr/src/app
 
@@ -42,7 +42,7 @@ COPY --from=builder /usr/src/app/apps/frontier-api/config ./apps/frontier-api/co
 
 WORKDIR /usr/src/app/apps/frontier-api
 
-EXPOSE 3000
+EXPOSE 8080
 
 CMD ["node", "dist/main"]
 
