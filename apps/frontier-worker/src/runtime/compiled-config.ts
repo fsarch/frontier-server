@@ -21,6 +21,17 @@ export type RouteResolution = {
   pathPrefix: string;
 };
 
+export type CompiledRouteDescription = {
+  domainGroupId: string;
+  domains: string[];
+  pathPrefix: string;
+  upstreamHost: string;
+  upstreamPort: number;
+  upstreamBasePath: string;
+  upstreamIndex: number;
+  upstreamCount: number;
+};
+
 export class CompiledWorkerConfig {
   private readonly domainToDomainGroupId = new Map<string, string>();
   private readonly domainGroups = new Map<string, CompiledDomainGroup>();
@@ -80,6 +91,32 @@ export class CompiledWorkerConfig {
     return null;
   }
 
+  public describeRoutes(): CompiledRouteDescription[] {
+    const descriptions: CompiledRouteDescription[] = [];
+    const domainsByDomainGroupId = this.buildDomainsByDomainGroupId();
+
+    for (const [domainGroupId, domainGroup] of this.domainGroups.entries()) {
+      const domains = domainsByDomainGroupId.get(domainGroupId) ?? [];
+
+      for (const route of domainGroup.routes) {
+        route.upstreams.forEach((upstream, index) => {
+          descriptions.push({
+            domainGroupId,
+            domains,
+            pathPrefix: route.pathPrefix,
+            upstreamHost: upstream.host,
+            upstreamPort: upstream.port,
+            upstreamBasePath: upstream.basePath,
+            upstreamIndex: index + 1,
+            upstreamCount: route.upstreams.length,
+          });
+        });
+      }
+    }
+
+    return descriptions;
+  }
+
   private debug(message: string) {
     if (!this.debugEnabled) {
       return;
@@ -89,14 +126,15 @@ export class CompiledWorkerConfig {
   }
 
   private compile() {
-    for (const domainName of this.snapshot.domainGroupDomainsByDomain.ids) {
-      const domainRef = this.snapshot.domainGroupDomainsByDomain.entities[domainName];
+    for (const domainId of this.snapshot.domainGroupDomainsByDomain.ids) {
+      const domainRef = this.snapshot.domainGroupDomainsByDomain.entities[domainId];
+      const domainName = domainRef?.domainName?.trim().toLowerCase();
 
-      if (!domainRef?.domainGroupId) {
+      if (!domainRef?.domainGroupId || !domainName) {
         continue;
       }
 
-      this.domainToDomainGroupId.set(domainName.toLowerCase(), domainRef.domainGroupId);
+      this.domainToDomainGroupId.set(domainName, domainRef.domainGroupId);
     }
 
     for (const domainGroupId of this.snapshot.domainGroups.ids) {
@@ -136,6 +174,31 @@ export class CompiledWorkerConfig {
       this.domainGroups.set(domainGroupId, { routes });
     }
   }
+
+  private buildDomainsByDomainGroupId(): Map<string, string[]> {
+    const domainsByDomainGroupId = new Map<string, Set<string>>();
+
+    for (const domainId of this.snapshot.domainGroupDomainsByDomain.ids) {
+      const domainRef = this.snapshot.domainGroupDomainsByDomain.entities[domainId];
+      const domainName = domainRef?.domainName?.trim().toLowerCase();
+
+      if (!domainRef?.domainGroupId || !domainName) {
+        continue;
+      }
+
+      const existingDomains = domainsByDomainGroupId.get(domainRef.domainGroupId) ?? new Set<string>();
+      existingDomains.add(domainName);
+      domainsByDomainGroupId.set(domainRef.domainGroupId, existingDomains);
+    }
+
+    const sortedDomainsByDomainGroupId = new Map<string, string[]>();
+
+    for (const [domainGroupId, domains] of domainsByDomainGroupId.entries()) {
+      sortedDomainsByDomainGroupId.set(domainGroupId, [...domains].sort((left, right) => left.localeCompare(right)));
+    }
+
+    return sortedDomainsByDomainGroupId;
+  }
 }
 
 function normalizeHostname(hostHeader: string): string {
@@ -167,7 +230,7 @@ export function buildUpstreamPath(basePath: string, pathPrefix: string, requestP
   }
 
   return suffix === '/'
-    ? normalizedBasePath
+    ? `${normalizedBasePath}/`
     : `${normalizedBasePath}${suffix}`;
 }
 
@@ -215,6 +278,11 @@ function normalizePathPattern(pathPattern: string): string {
     return `*${trimmedPattern.slice(2)}`;
   }
 
+  if (trimmedPattern.endsWith('/*')) {
+    const prefix = trimmedPattern.slice(0, -2);
+    return prefix ? normalizePath(prefix) : '*';
+  }
+
   return normalizePath(trimmedPattern);
 }
 
@@ -231,7 +299,7 @@ function buildPrefixRewriteSuffix(normalizedRequestPath: string, normalizedPrefi
     return normalizedRequestPath;
   }
 
-  return normalizedRequestPath.slice(normalizedPrefix.length) || '/';
+  return normalizedRequestPath.slice(normalizedPrefix.length);
 }
 
 function isDebugEnabled(value: string | undefined): boolean {

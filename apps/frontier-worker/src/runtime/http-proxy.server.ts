@@ -33,6 +33,7 @@ export class HttpProxyServer {
 
   private activeConfig: CompiledWorkerConfig | null = null;
   private activeVersion = 0;
+  private hasPrintedInitialRoutes = false;
   private server: Server;
 
   constructor(private readonly port: number) {
@@ -42,6 +43,12 @@ export class HttpProxyServer {
   public setSnapshot(version: number, snapshot: WorkerConfigSnapshot) {
     this.activeConfig = new CompiledWorkerConfig(snapshot);
     this.activeVersion = version;
+
+    if (!this.hasPrintedInitialRoutes) {
+      this.printInitialRoutes(version, this.activeConfig);
+      this.hasPrintedInitialRoutes = true;
+    }
+
     this.debug(`applied snapshot version=${version}`);
   }
 
@@ -109,12 +116,14 @@ export class HttpProxyServer {
 
       const upstreamPath = buildUpstreamPath(route.upstream.basePath, route.pathPrefix, requestUrl.pathname);
       const upstreamUrl = `http://${route.upstream.host}:${route.upstream.port}${upstreamPath}${requestUrl.search}`;
+      const upstreamHeaders = buildRequestHeaders(req.headers);
 
       this.debug(`resolved request host=${hostHeader ?? '<missing>'} path=${requestUrl.pathname} routePrefix=${route.pathPrefix} upstream=${upstreamUrl}`);
+      this.debug(`upstream request method=${method} url=${upstreamUrl}`);
 
       const upstreamRes = await proxyRequest(upstreamUrl, {
         method,
-        headers: buildRequestHeaders(req.headers),
+        headers: upstreamHeaders,
         body: method === 'GET' || method === 'HEAD' ? undefined : req,
       });
 
@@ -152,6 +161,26 @@ export class HttpProxyServer {
     }
 
     console.debug(`[worker][proxy] ${message}`);
+  }
+
+  private printInitialRoutes(version: number, config: CompiledWorkerConfig) {
+    const routes = config.describeRoutes();
+    console.log(`[worker][routes] initial route table loaded (configVersion=${version})`);
+
+    if (routes.length === 0) {
+      console.log('[worker][routes] no routes configured');
+      return;
+    }
+
+    for (const route of routes) {
+      const hosts = route.domains.length > 0 ? route.domains : ['<no-domain-mapping>'];
+
+      for (const host of hosts) {
+        console.log(
+          `[worker][routes] domainGroup=${route.domainGroupId} host=${host} match=${route.pathPrefix} upstream=${route.upstreamHost}:${route.upstreamPort}${route.upstreamBasePath} target=${route.upstreamIndex}/${route.upstreamCount}`,
+        );
+      }
+    }
   }
 }
 
