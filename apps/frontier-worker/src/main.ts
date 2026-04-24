@@ -43,3 +43,5 @@ bootstrap().catch((error) => {
   console.error('[worker] fatal bootstrap error', error);
   process.exit(1);
 });
+
+

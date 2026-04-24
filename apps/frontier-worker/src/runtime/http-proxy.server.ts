@@ -11,6 +11,12 @@ type Metrics = {
   totalErrors: number;
 };
 
+type RouteCorsPolicy = {
+  enabled: boolean;
+  allowCredentials: boolean;
+  allowedOrigins: string[];
+};
+
 const HOP_BY_HOP_HEADERS = new Set([
   'connection',
   'keep-alive',
@@ -52,9 +58,6 @@ export class HttpProxyServer {
     this.debug(`applied snapshot version=${version}`);
   }
 
-  public getActiveVersion(): number {
-    return this.activeVersion;
-  }
 
   public getMetrics() {
     const uptimeMs = Date.now() - this.metrics.startedAt;
@@ -117,6 +120,25 @@ export class HttpProxyServer {
       const upstreamPath = buildUpstreamPath(route.upstream.basePath, route.pathPrefix, requestUrl.pathname);
       const upstreamUrl = `http://${route.upstream.host}:${route.upstream.port}${upstreamPath}${requestUrl.search}`;
       const upstreamHeaders = buildRequestHeaders(req.headers);
+      const requestOrigin = getSingleHeaderValue(req.headers.origin);
+
+      if (isCorsPreflightRequest(method, req.headers) && route.cors.enabled) {
+        if (!requestOrigin || !isCorsOriginAllowed(route.cors, requestOrigin)) {
+          res.writeHead(403).end('cors origin is not allowed');
+          return;
+        }
+
+        const preflightHeaders = buildCorsHeaders(route.cors, requestOrigin, req.headers['access-control-request-headers']);
+        this.debug(`cors preflight accepted origin=${requestOrigin} path=${requestUrl.pathname}`);
+        res.writeHead(204, preflightHeaders).end();
+        return;
+      }
+
+      if (route.cors.enabled && requestOrigin && !isCorsOriginAllowed(route.cors, requestOrigin)) {
+        this.debug(`cors rejected origin=${requestOrigin} path=${requestUrl.pathname}`);
+        res.writeHead(403).end('cors origin is not allowed');
+        return;
+      }
 
       this.debug(`resolved request host=${hostHeader ?? '<missing>'} path=${requestUrl.pathname} routePrefix=${route.pathPrefix} upstream=${upstreamUrl}`);
       this.debug(`upstream request method=${method} url=${upstreamUrl}`);
@@ -128,6 +150,9 @@ export class HttpProxyServer {
       });
 
       const responseHeaders = buildResponseHeaders(upstreamRes.headers as IncomingHttpHeaders);
+      if (route.cors.enabled && requestOrigin) {
+        Object.assign(responseHeaders, buildCorsHeaders(route.cors, requestOrigin));
+      }
       this.debug(`upstream response status=${upstreamRes.statusCode} upstream=${upstreamUrl}`);
       res.writeHead(upstreamRes.statusCode, responseHeaders);
 
@@ -207,6 +232,54 @@ function buildResponseHeaders(headers: IncomingHttpHeaders): Record<string, stri
     }
 
     result[name] = Array.isArray(value) ? value.join(',') : value;
+  }
+
+  return result;
+}
+
+function getSingleHeaderValue(value: string | string[] | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function isCorsPreflightRequest(method: string, headers: IncomingHttpHeaders): boolean {
+  return method === 'OPTIONS' && Boolean(headers.origin) && Boolean(headers['access-control-request-method']);
+}
+
+export function isCorsOriginAllowed(policy: RouteCorsPolicy, origin: string): boolean {
+  if (!policy.enabled) {
+    return false;
+  }
+
+  return policy.allowedOrigins.includes('*') || policy.allowedOrigins.includes(origin);
+}
+
+export function buildCorsHeaders(
+  policy: RouteCorsPolicy,
+  origin: string,
+  requestHeaders?: string | string[],
+): Record<string, string> {
+  const allowOrigin = policy.allowedOrigins.includes('*') && !policy.allowCredentials
+    ? '*'
+    : origin;
+
+  const result: Record<string, string> = {
+    'access-control-allow-origin': allowOrigin,
+    'access-control-allow-methods': 'GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS',
+    'access-control-max-age': '600',
+    vary: 'Origin',
+  };
+
+  const requestedHeaders = getSingleHeaderValue(requestHeaders);
+  result['access-control-allow-headers'] = requestedHeaders && requestedHeaders.trim().length > 0
+    ? requestedHeaders
+    : '*';
+
+  if (policy.allowCredentials) {
+    result['access-control-allow-credentials'] = 'true';
   }
 
   return result;

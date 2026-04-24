@@ -289,6 +289,32 @@ describe('CompiledWorkerConfig', () => {
     expect(route?.upstream.host).toBe('api.internal');
     expect(descriptions[0].domains).toEqual(['vb3d.de']);
   });
+
+  it('compiles and resolves cors policy per matched rule', () => {
+    const snapshot = createSnapshot();
+    snapshot.domainGroups.entities['dg-1'].pathRules = [
+      {
+        id: 'rule-1',
+        domainGroupId: 'dg-1',
+        name: 'api',
+        path: '/api',
+        order: 1,
+        cachePolicyId: null,
+        upstreamGroupId: 'ug-1',
+        corsEnabled: true,
+        corsAllowCredentials: true,
+        corsAllowedOrigins: ['https://app.example.com', '*'],
+      },
+    ];
+
+    const config = new CompiledWorkerConfig(snapshot);
+    const route = config.resolve('example.com', '/api/users');
+
+    expect(route).not.toBeNull();
+    expect(route?.cors.enabled).toBe(true);
+    expect(route?.cors.allowCredentials).toBe(true);
+    expect(route?.cors.allowedOrigins).toEqual(['https://app.example.com', '*']);
+  });
 });
 
 describe('buildUpstreamPath', () => {

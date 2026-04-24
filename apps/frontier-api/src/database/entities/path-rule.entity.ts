@@ -56,6 +56,29 @@ export class PathRule {
   })
   upstreamGroupId: string;
 
+  @Column({
+    name: 'cors_enabled',
+    type: 'boolean',
+    nullable: false,
+    default: false,
+  })
+  corsEnabled: boolean;
+
+  @Column({
+    name: 'cors_allow_credentials',
+    type: 'boolean',
+    nullable: false,
+    default: false,
+  })
+  corsAllowCredentials: boolean;
+
+  @Column({
+    name: 'cors_allowed_origins',
+    type: 'simple-array',
+    nullable: true,
+  })
+  corsAllowedOrigins?: string[];
+
   @CreateDateColumn({
     name: 'creation_time',
   })

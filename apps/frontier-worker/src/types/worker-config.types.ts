@@ -11,6 +11,9 @@ export type PathRule = {
   order: number;
   cachePolicyId: string | null;
   upstreamGroupId: string | null;
+  corsEnabled?: boolean;
+  corsAllowCredentials?: boolean;
+  corsAllowedOrigins?: string[];
 };
 
 export type DomainGroup = {

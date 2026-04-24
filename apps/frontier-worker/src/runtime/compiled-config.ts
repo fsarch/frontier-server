@@ -1,4 +1,4 @@
-import { WorkerConfigSnapshot } from '../types/worker-config.types';
+import { PathRule, WorkerConfigSnapshot } from '../types/worker-config.types';
 
 type CompiledUpstream = {
   host: string;
@@ -9,7 +9,14 @@ type CompiledUpstream = {
 type CompiledRoute = {
   pathPrefix: string;
   upstreams: CompiledUpstream[];
+  cors: CompiledCorsPolicy;
   cursor: number;
+};
+
+type CompiledCorsPolicy = {
+  enabled: boolean;
+  allowCredentials: boolean;
+  allowedOrigins: Set<string>;
 };
 
 type CompiledDomainGroup = {
@@ -19,6 +26,11 @@ type CompiledDomainGroup = {
 export type RouteResolution = {
   upstream: CompiledUpstream;
   pathPrefix: string;
+  cors: {
+    enabled: boolean;
+    allowCredentials: boolean;
+    allowedOrigins: string[];
+  };
 };
 
 export type CompiledRouteDescription = {
@@ -83,6 +95,11 @@ export class CompiledWorkerConfig {
       return {
         upstream,
         pathPrefix: route.pathPrefix,
+        cors: {
+          enabled: route.cors.enabled,
+          allowCredentials: route.cors.allowCredentials,
+          allowedOrigins: [...route.cors.allowedOrigins],
+        },
       };
     }
 
@@ -167,6 +184,7 @@ export class CompiledWorkerConfig {
         routes.push({
           pathPrefix: pathPattern,
           upstreams,
+          cors: compileCorsPolicy(rule),
           cursor: 0,
         });
       }
@@ -308,5 +326,27 @@ function isDebugEnabled(value: string | undefined): boolean {
   }
 
   return value === '1' || value.toLowerCase() === 'true' || value.toLowerCase() === 'debug';
+}
+
+function compileCorsPolicy(rule: PathRule): CompiledCorsPolicy {
+  const enabled = rule.corsEnabled === true;
+  const allowCredentials = enabled && rule.corsAllowCredentials === true;
+  const allowedOrigins = new Set<string>();
+
+  for (const origin of rule.corsAllowedOrigins ?? []) {
+    const normalizedOrigin = origin.trim();
+
+    if (!normalizedOrigin) {
+      continue;
+    }
+
+    allowedOrigins.add(normalizedOrigin);
+  }
+
+  return {
+    enabled,
+    allowCredentials,
+    allowedOrigins,
+  };
 }
 

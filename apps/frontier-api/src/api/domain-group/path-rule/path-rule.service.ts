@@ -17,10 +17,17 @@ export class PathRuleService {
     domainGroupId: string,
     pathRuleDto: PathRuleCreateDto,
   ) {
+    const normalizedCorsAllowedOrigins = (pathRuleDto.corsAllowedOrigins ?? [])
+      .map((origin) => origin.trim())
+      .filter((origin) => origin.length > 0);
+
     const createdPathRule = this.pathRuleRepository.create({
       id: crypto.randomUUID(),
       domainGroupId,
       ...pathRuleDto,
+      corsAllowedOrigins: normalizedCorsAllowedOrigins,
+      corsEnabled: pathRuleDto.corsEnabled === true,
+      corsAllowCredentials: pathRuleDto.corsAllowCredentials === true,
     });
 
     const savedPathRule = await this.pathRuleRepository.save(createdPathRule);
