@@ -74,7 +74,8 @@ export class PathRule {
 
   @Column({
     name: 'cors_allowed_origins',
-    type: 'simple-array',
+    type: 'text',
+    array: true,
     nullable: true,
   })
   corsAllowedOrigins?: string[];
