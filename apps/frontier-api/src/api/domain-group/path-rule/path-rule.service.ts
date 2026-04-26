@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { PathRule } from "../../../database/entities/path-rule.entity";
-import { PathRuleCreateDto } from "../../../models/path-rule.model";
+import { PathRuleCreateDto, PathRuleUpdateDto } from "../../../models/path-rule.model";
 
 @Injectable()
 export class PathRuleService {
@@ -54,5 +54,34 @@ export class PathRuleService {
         order: "ASC",
       },
     });
+  }
+
+  public async GetById(id: string): Promise<PathRule> {
+    const pathRule = await this.pathRuleRepository.findOne({ where: { id } });
+
+    if (!pathRule) {
+      throw new NotFoundException(`PathRule ${id} not found`);
+    }
+
+    return pathRule;
+  }
+
+  public async Update(id: string, dto: PathRuleUpdateDto): Promise<PathRule> {
+    const pathRule = await this.GetById(id);
+
+    if (dto.corsAllowedOrigins !== undefined) {
+      dto.corsAllowedOrigins = dto.corsAllowedOrigins
+        .map((o) => o.trim())
+        .filter((o) => o.length > 0);
+    }
+
+    Object.assign(pathRule, dto);
+
+    return this.pathRuleRepository.save(pathRule);
+  }
+
+  public async Delete(id: string): Promise<void> {
+    const pathRule = await this.GetById(id);
+    await this.pathRuleRepository.softDelete(pathRule.id);
   }
 }

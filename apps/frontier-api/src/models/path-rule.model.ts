@@ -51,6 +51,40 @@ export class PathRuleDto {
   corsAllowedOrigins: string[];
 }
 
+export class PathRuleUpdateDto {
+  @ApiProperty({ required: false })
+  @Optional()
+  name?: string;
+
+  @ApiProperty({ required: false })
+  @Optional()
+  path?: string;
+
+  @ApiProperty({ required: false })
+  @Optional()
+  cachePolicyId?: string;
+
+  @ApiProperty({ required: false })
+  @Optional()
+  upstreamGroupId?: string;
+
+  @ApiProperty({ required: false })
+  @Optional()
+  order?: number;
+
+  @ApiProperty({ required: false })
+  @Optional()
+  corsEnabled?: boolean;
+
+  @ApiProperty({ required: false })
+  @Optional()
+  corsAllowCredentials?: boolean;
+
+  @ApiProperty({ required: false, type: [String] })
+  @Optional()
+  corsAllowedOrigins?: string[];
+}
+
 export class PathRuleCreateDto {
   @ApiProperty()
   name: string;
