@@ -64,6 +64,7 @@ async function postRequestLog(payload: RequestLogPayload): Promise<void> {
   if (response.statusCode >= 300) {
     const responseText = await response.body.text();
     const errorDetails = responseText ? ` (${responseText})` : '';
+    console.error(`[worker] log ingest failed: status=${response.statusCode}, token=${workerAuthToken ? 'set' : 'empty'}, url=${workerLogIngestUrl}, details=${errorDetails}`);
     throw new Error(`log ingest failed status=${response.statusCode}${errorDetails} url=${workerLogIngestUrl}`);
   }
 

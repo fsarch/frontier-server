@@ -4,11 +4,13 @@ import { WorkerRequestLogCreateDto } from '../../../models/request-log.model';
 import { Inject } from '@nestjs/common';
 import { ModuleConfigurationService } from '../../../fsarch/configuration/module/module-configuration.service';
 import { ConfigWorkersType } from '../../../fsarch/configuration/config.type';
+import { Public } from '../../../fsarch/auth/decorators/public.decorator';
 
 @Controller({
   path: 'api/workers/logs',
   version: VERSION_NEUTRAL,
 })
+@Public()
 export class WorkerLogController {
   private readonly logger = new Logger(WorkerLogController.name);
 
@@ -27,7 +29,12 @@ export class WorkerLogController {
   ) {
     const websocketConfig = this.workersConfigService.get('websocket');
     const expectedToken = websocketConfig?.auth_token;
-    
+
+    this.logger.debug(
+      `Worker token validation: Received=${workerToken ? '[redacted]' : '<empty>'}, ` +
+      `Expected=${expectedToken ? `[${expectedToken.substring(0, 3)}...]` : '<not configured>'}`,
+    );
+
     if (!workerToken || !expectedToken || workerToken !== expectedToken) {
       this.logger.warn(
         `Worker token validation failed. Received: ${workerToken ? '[redacted]' : '<empty>'}, ` +
