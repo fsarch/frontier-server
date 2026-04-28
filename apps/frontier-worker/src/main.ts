@@ -9,6 +9,7 @@ const heartbeatIntervalMs = parseInt(process.env.FRONTIER_WORKER_HEARTBEAT_MS ??
 const workerLogIngestUrl = process.env.FRONTIER_WORKER_LOG_INGEST_URL ?? deriveWorkerLogIngestUrl(controlPlaneUrl);
 
 async function bootstrap() {
+  console.log(`[worker] initializing worker auth=${process.env.FRONTIER_WORKER_AUTH_TOKEN ? 'env' : 'default'} logIngestUrl=${workerLogIngestUrl}`);
   const proxyServer = new HttpProxyServer(workerPort, {
     onRequestLog: async (payload) => {
       await postRequestLog(payload);
@@ -61,7 +62,9 @@ async function postRequestLog(payload: RequestLogPayload): Promise<void> {
   });
 
   if (response.statusCode >= 300) {
-    throw new Error(`log ingest failed status=${response.statusCode}`);
+    const responseText = await response.body.text();
+    const errorDetails = responseText ? ` (${responseText})` : '';
+    throw new Error(`log ingest failed status=${response.statusCode}${errorDetails} url=${workerLogIngestUrl}`);
   }
 
   await response.body.text();

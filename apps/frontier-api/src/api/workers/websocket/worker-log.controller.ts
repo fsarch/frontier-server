@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, HttpCode, HttpException, HttpStatus, Post, VERSION_NEUTRAL } from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, HttpException, HttpStatus, Post, VERSION_NEUTRAL, Logger } from '@nestjs/common';
 import { RequestLogService } from '../../domain-group/request-log/request-log.service';
 import { WorkerRequestLogCreateDto } from '../../../models/request-log.model';
 import { Inject } from '@nestjs/common';
@@ -10,6 +10,8 @@ import { ConfigWorkersType } from '../../../fsarch/configuration/config.type';
   version: VERSION_NEUTRAL,
 })
 export class WorkerLogController {
+  private readonly logger = new Logger(WorkerLogController.name);
+
   constructor(
     @Inject('WORKERS_CONFIG')
     private readonly workersConfigService: ModuleConfigurationService<ConfigWorkersType>,
@@ -23,7 +25,14 @@ export class WorkerLogController {
     @Body() payload: WorkerRequestLogCreateDto,
     @Headers('x-worker-token') workerToken: string | undefined,
   ) {
-    if (!workerToken || workerToken !== this.workersConfigService.get('websocket').auth_token) {
+    const websocketConfig = this.workersConfigService.get('websocket');
+    const expectedToken = websocketConfig?.auth_token;
+    
+    if (!workerToken || !expectedToken || workerToken !== expectedToken) {
+      this.logger.warn(
+        `Worker token validation failed. Received: ${workerToken ? '[redacted]' : '<empty>'}, ` +
+        `Expected: ${expectedToken ? '[configured]' : '<not configured>'}`,
+      );
       throw new HttpException('Unauthorized worker token', HttpStatus.UNAUTHORIZED);
     }
 

@@ -275,6 +275,7 @@ export class HttpProxyServer {
         ...payload,
       });
     } catch (error) {
+      console.error('[worker][proxy] request log reporting failed', error);
       this.debug('request log reporting failed', error);
     }
   }
