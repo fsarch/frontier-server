@@ -14,6 +14,7 @@ export class PathRuleDto {
     dto.upstreamGroupId = dbo.upstreamGroupId;
     dto.order = dbo.order;
     dto.corsPolicyId = dbo.corsPolicyId ?? null;
+    dto.logPolicyId = dbo.logPolicyId ?? null;
 
     return dto;
   }
@@ -41,6 +42,9 @@ export class PathRuleDto {
 
   @ApiProperty({ required: false })
   corsPolicyId: string | null;
+
+  @ApiProperty({ required: false })
+  logPolicyId: string | null;
 }
 
 export class PathRuleUpdateDto {
@@ -67,6 +71,10 @@ export class PathRuleUpdateDto {
   @ApiProperty({ required: false })
   @Optional()
   corsPolicyId?: string | null;
+
+  @ApiProperty({ required: false })
+  @Optional()
+  logPolicyId?: string | null;
 }
 
 export class PathRuleCreateDto {
@@ -89,4 +97,8 @@ export class PathRuleCreateDto {
   @ApiProperty({ required: false })
   @Optional()
   corsPolicyId?: string | null;
+
+  @ApiProperty({ required: false })
+  @Optional()
+  logPolicyId?: string | null;
 }

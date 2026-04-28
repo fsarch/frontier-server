@@ -50,6 +50,10 @@ function createSnapshot(): WorkerConfigSnapshot {
       ids: [],
       entities: {},
     },
+    logPolicies: {
+      ids: [],
+      entities: {},
+    },
     upstreamGroups: {
       ids: ['ug-1', 'ug-2'],
       entities: {
@@ -329,6 +333,43 @@ describe('CompiledWorkerConfig', () => {
     expect(route?.cors.enabled).toBe(true);
     expect(route?.cors.allowCredentials).toBe(true);
     expect(route?.cors.allowedOrigins).toEqual(['https://app.example.com', '*']);
+  });
+
+  it('compiles and resolves log policy per matched rule', () => {
+    const snapshot = createSnapshot();
+    snapshot.domainGroups.entities['dg-1'].pathRules = [
+      {
+        id: 'rule-1',
+        domainGroupId: 'dg-1',
+        name: 'api',
+        path: '/api',
+        order: 1,
+        cachePolicyId: null,
+        upstreamGroupId: 'ug-1',
+        logPolicyId: 'lp-1',
+      },
+    ];
+    snapshot.logPolicies = {
+      ids: ['lp-1'],
+      entities: {
+        'lp-1': {
+          id: 'lp-1',
+          domainGroupId: 'dg-1',
+          name: 'requests',
+          enabled: true,
+          retentionTimeSeconds: 3600,
+        },
+      },
+    };
+
+    const config = new CompiledWorkerConfig(snapshot);
+    const route = config.resolve('example.com', '/api/users');
+
+    expect(route).not.toBeNull();
+    expect(route?.log.enabled).toBe(true);
+    expect(route?.log.logPolicyId).toBe('lp-1');
+    expect(route?.domainGroupId).toBe('dg-1');
+    expect(route?.pathRuleId).toBe('rule-1');
   });
 });
 

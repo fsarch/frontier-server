@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { FrontierApiController } from './frontier-api.controller';
 import { FrontierApiService } from './frontier-api.service';
 import { BaseTables1720373216667 } from "./database/migrations/1720373216667-base-tables";
@@ -13,6 +14,7 @@ import { ApiModule } from './api/api.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ApiModule,
   ],
   controllers: [FrontierApiController],

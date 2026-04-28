@@ -63,6 +63,13 @@ export class PathRule {
   })
   corsPolicyId?: string | null;
 
+  @Column({
+    name: 'log_policy_id',
+    type: 'uuid',
+    nullable: true,
+  })
+  logPolicyId?: string | null;
+
   @CreateDateColumn({
     name: 'creation_time',
   })

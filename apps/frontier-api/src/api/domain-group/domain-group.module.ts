@@ -6,7 +6,9 @@ import { DomainGroup } from "../../database/entities/domain-group.entity";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { CachePolicyModule } from './cache-policy/cache-policy.module';
 import { CorsPolicyModule } from './cors-policy/cors-policy.module';
+import { LogPolicyModule } from './log-policy/log-policy.module';
 import { PathRuleModule } from './path-rule/path-rule.module';
+import { RequestLogModule } from './request-log/request-log.module';
 import { UpstreamGroupModule } from './upstream-group/upstream-group.module';
 
 @Module({
@@ -18,7 +20,9 @@ import { UpstreamGroupModule } from './upstream-group/upstream-group.module';
     TypeOrmModule.forFeature([DomainGroup]),
     CachePolicyModule,
     CorsPolicyModule,
+    LogPolicyModule,
     PathRuleModule,
+    RequestLogModule,
     UpstreamGroupModule,
   ]
 })

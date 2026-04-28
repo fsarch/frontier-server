@@ -7,7 +7,10 @@ type CompiledUpstream = {
 };
 
 type CompiledRoute = {
+  domainGroupId: string;
+  pathRuleId: string;
   pathPrefix: string;
+  log: CompiledLogPolicy;
   upstreams: CompiledUpstream[];
   cors: CompiledCorsPolicy;
   cursor: number;
@@ -19,17 +22,30 @@ type CompiledCorsPolicy = {
   allowedOrigins: Set<string>;
 };
 
+type CompiledLogPolicy = {
+  enabled: boolean;
+  logPolicyId: string | null;
+  retentionTimeSeconds: number;
+};
+
 type CompiledDomainGroup = {
   routes: CompiledRoute[];
 };
 
 export type RouteResolution = {
+  domainGroupId: string;
+  pathRuleId: string;
   upstream: CompiledUpstream;
   pathPrefix: string;
   cors: {
     enabled: boolean;
     allowCredentials: boolean;
     allowedOrigins: string[];
+  };
+  log: {
+    enabled: boolean;
+    logPolicyId: string | null;
+    retentionTimeSeconds: number;
   };
 };
 
@@ -93,12 +109,19 @@ export class CompiledWorkerConfig {
       this.debug(`resolve hit: domainGroup=${domainGroupId} prefix=${route.pathPrefix} upstream=${upstream.host}:${upstream.port}${upstream.basePath} nextCursor=${route.cursor}`);
 
       return {
+        domainGroupId,
+        pathRuleId: route.pathRuleId,
         upstream,
         pathPrefix: route.pathPrefix,
         cors: {
           enabled: route.cors.enabled,
           allowCredentials: route.cors.allowCredentials,
           allowedOrigins: [...route.cors.allowedOrigins],
+        },
+        log: {
+          enabled: route.log.enabled,
+          logPolicyId: route.log.logPolicyId,
+          retentionTimeSeconds: route.log.retentionTimeSeconds,
         },
       };
     }
@@ -182,7 +205,10 @@ export class CompiledWorkerConfig {
         }
 
         routes.push({
+          domainGroupId,
+          pathRuleId: rule.id,
           pathPrefix: pathPattern,
+          log: compileLogPolicy(rule.logPolicyId ? this.snapshot.logPolicies.entities[rule.logPolicyId] : undefined),
           upstreams,
           cors: compileCorsPolicy(rule.corsPolicyId ? this.snapshot.corsPolicies.entities[rule.corsPolicyId] : undefined),
           cursor: 0,
@@ -347,6 +373,14 @@ function compileCorsPolicy(policy: CorsPolicy | undefined): CompiledCorsPolicy {
     enabled,
     allowCredentials,
     allowedOrigins,
+  };
+}
+
+function compileLogPolicy(policy: WorkerConfigSnapshot['logPolicies']['entities'][string] | undefined): CompiledLogPolicy {
+  return {
+    enabled: policy?.enabled === true,
+    logPolicyId: policy?.id ?? null,
+    retentionTimeSeconds: policy?.retentionTimeSeconds ?? 0,
   };
 }
 

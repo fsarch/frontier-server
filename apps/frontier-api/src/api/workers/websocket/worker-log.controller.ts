@@ -1,0 +1,33 @@
+import { Body, Controller, Headers, HttpCode, HttpException, HttpStatus, Post, VERSION_NEUTRAL } from '@nestjs/common';
+import { RequestLogService } from '../../domain-group/request-log/request-log.service';
+import { WorkerRequestLogCreateDto } from '../../../models/request-log.model';
+import { Inject } from '@nestjs/common';
+import { ModuleConfigurationService } from '../../../fsarch/configuration/module/module-configuration.service';
+import { ConfigWorkersType } from '../../../fsarch/configuration/config.type';
+
+@Controller({
+  path: 'api/workers/logs',
+  version: VERSION_NEUTRAL,
+})
+export class WorkerLogController {
+  constructor(
+    @Inject('WORKERS_CONFIG')
+    private readonly workersConfigService: ModuleConfigurationService<ConfigWorkersType>,
+    private readonly requestLogService: RequestLogService,
+  ) {
+  }
+
+  @Post()
+  @HttpCode(202)
+  public async Create(
+    @Body() payload: WorkerRequestLogCreateDto,
+    @Headers('x-worker-token') workerToken: string | undefined,
+  ) {
+    if (!workerToken || workerToken !== this.workersConfigService.get('websocket').auth_token) {
+      throw new HttpException('Unauthorized worker token', HttpStatus.UNAUTHORIZED);
+    }
+
+    await this.requestLogService.Create(payload);
+  }
+}
+

@@ -17,6 +17,24 @@ type RouteCorsPolicy = {
   allowedOrigins: string[];
 };
 
+export type RequestLogPayload = {
+  domainGroupId: string;
+  pathRuleId: string;
+  logPolicyId: string;
+  incomingMethod: string;
+  incomingUrl: string;
+  incomingHeaders: Record<string, string | string[]>;
+  upstreamMethod: string;
+  upstreamUrl: string;
+  upstreamHeaders: Record<string, string>;
+  responseStatusCode: number;
+  requestTimeMs: number;
+};
+
+type HttpProxyServerOptions = {
+  onRequestLog?: (payload: RequestLogPayload) => Promise<void>;
+};
+
 const HOP_BY_HOP_HEADERS = new Set([
   'connection',
   'keep-alive',
@@ -42,7 +60,10 @@ export class HttpProxyServer {
   private hasPrintedInitialRoutes = false;
   private server: Server;
 
-  constructor(private readonly port: number) {
+  constructor(
+    private readonly port: number,
+    private readonly options?: HttpProxyServerOptions,
+  ) {
     this.server = createServer(this.handleRequest.bind(this));
   }
 
@@ -95,11 +116,20 @@ export class HttpProxyServer {
   private async handleRequest(req: IncomingMessage, res: ServerResponse) {
     this.metrics.inflight += 1;
     this.metrics.totalRequests += 1;
+    const requestStartedAt = Date.now();
+    let resolvedRoute: ReturnType<CompiledWorkerConfig['resolve']> = null;
+    let incomingMethod = 'GET';
+    let incomingUrl = '/';
+    let upstreamMethod = 'GET';
+    let upstreamUrl = '/';
+    let upstreamHeaders: Record<string, string> = {};
 
     try {
       const method = req.method ?? 'GET';
       const requestUrl = new URL(req.url ?? '/', 'http://frontier-worker.local');
       const hostHeader = req.headers.host;
+      incomingMethod = method;
+      incomingUrl = buildIncomingUrl(hostHeader, requestUrl);
 
       this.debug(`incoming request method=${method} host=${hostHeader ?? '<missing>'} path=${requestUrl.pathname}${requestUrl.search} activeConfigVersion=${this.activeVersion}`);
 
@@ -110,6 +140,7 @@ export class HttpProxyServer {
       }
 
       const route = this.activeConfig.resolve(hostHeader, requestUrl.pathname);
+      resolvedRoute = route;
 
       if (!route) {
         this.debug(`no route match for host=${hostHeader ?? '<missing>'} path=${requestUrl.pathname}`);
@@ -119,24 +150,55 @@ export class HttpProxyServer {
 
       const upstreamPath = buildUpstreamPath(route.upstream.basePath, route.pathPrefix, requestUrl.pathname);
       const upstreamUrl = `http://${route.upstream.host}:${route.upstream.port}${upstreamPath}${requestUrl.search}`;
-      const upstreamHeaders = buildRequestHeaders(req.headers);
+      upstreamHeaders = buildRequestHeaders(req.headers);
       const requestOrigin = getSingleHeaderValue(req.headers.origin);
+      upstreamMethod = method;
 
       if (isCorsPreflightRequest(method, req.headers) && route.cors.enabled) {
         if (!requestOrigin || !isCorsOriginAllowed(route.cors, requestOrigin)) {
           res.writeHead(403).end('cors origin is not allowed');
+          await this.reportRequestLog(route, {
+            incomingMethod: method,
+            incomingUrl,
+            incomingHeaders: req.headers,
+            upstreamMethod: method,
+            upstreamUrl,
+            upstreamHeaders,
+            responseStatusCode: 403,
+            requestTimeMs: Date.now() - requestStartedAt,
+          });
           return;
         }
 
         const preflightHeaders = buildCorsHeaders(route.cors, requestOrigin, req.headers['access-control-request-headers']);
         this.debug(`cors preflight accepted origin=${requestOrigin} path=${requestUrl.pathname}`);
         res.writeHead(204, preflightHeaders).end();
+        await this.reportRequestLog(route, {
+          incomingMethod: method,
+          incomingUrl,
+          incomingHeaders: req.headers,
+          upstreamMethod: method,
+          upstreamUrl,
+          upstreamHeaders,
+          responseStatusCode: 204,
+          requestTimeMs: Date.now() - requestStartedAt,
+        });
         return;
       }
 
       if (route.cors.enabled && requestOrigin && !isCorsOriginAllowed(route.cors, requestOrigin)) {
         this.debug(`cors rejected origin=${requestOrigin} path=${requestUrl.pathname}`);
         res.writeHead(403).end('cors origin is not allowed');
+        await this.reportRequestLog(route, {
+          incomingMethod: method,
+          incomingUrl,
+          incomingHeaders: req.headers,
+          upstreamMethod: method,
+          upstreamUrl,
+          upstreamHeaders,
+          responseStatusCode: 403,
+          requestTimeMs: Date.now() - requestStartedAt,
+        });
         return;
       }
 
@@ -161,6 +223,17 @@ export class HttpProxyServer {
       } else {
         res.end();
       }
+
+      await this.reportRequestLog(route, {
+        incomingMethod: method,
+        incomingUrl,
+        incomingHeaders: req.headers,
+        upstreamMethod: method,
+        upstreamUrl,
+        upstreamHeaders,
+        responseStatusCode: upstreamRes.statusCode,
+        requestTimeMs: Date.now() - requestStartedAt,
+      });
     } catch (error) {
       this.metrics.totalErrors += 1;
       this.debug('upstream request failed', error);
@@ -170,8 +243,39 @@ export class HttpProxyServer {
       } else {
         res.end();
       }
+
+      await this.reportRequestLog(resolvedRoute, {
+        incomingMethod,
+        incomingUrl,
+        incomingHeaders: req.headers,
+        upstreamMethod,
+        upstreamUrl,
+        upstreamHeaders,
+        responseStatusCode: res.statusCode || 502,
+        requestTimeMs: Date.now() - requestStartedAt,
+      });
     } finally {
       this.metrics.inflight -= 1;
+    }
+  }
+
+  private async reportRequestLog(
+    route: ReturnType<CompiledWorkerConfig['resolve']>,
+    payload: Omit<RequestLogPayload, 'domainGroupId' | 'pathRuleId' | 'logPolicyId'>,
+  ) {
+    if (!route || !route.log.enabled || !route.log.logPolicyId || !this.options?.onRequestLog) {
+      return;
+    }
+
+    try {
+      await this.options.onRequestLog({
+        domainGroupId: route.domainGroupId,
+        pathRuleId: route.pathRuleId,
+        logPolicyId: route.log.logPolicyId,
+        ...payload,
+      });
+    } catch (error) {
+      this.debug('request log reporting failed', error);
     }
   }
 
@@ -291,5 +395,13 @@ function isDebugEnabled(value: string | undefined): boolean {
   }
 
   return value === '1' || value.toLowerCase() === 'true' || value.toLowerCase() === 'debug';
+}
+
+function buildIncomingUrl(hostHeader: string | undefined, requestUrl: URL): string {
+  if (!hostHeader) {
+    return `${requestUrl.pathname}${requestUrl.search}`;
+  }
+
+  return `http://${hostHeader}${requestUrl.pathname}${requestUrl.search}`;
 }
 

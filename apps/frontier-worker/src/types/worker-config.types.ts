@@ -12,6 +12,7 @@ export type PathRule = {
   cachePolicyId: string | null;
   upstreamGroupId: string | null;
   corsPolicyId?: string | null;
+  logPolicyId?: string | null;
 };
 
 export type CorsPolicy = {
@@ -56,7 +57,16 @@ export type WorkerConfigSnapshot = {
   domainGroupDomainsByDomain: EntityMap<DomainGroupDomain>;
   cachePolicies: EntityMap<unknown>;
   corsPolicies: EntityMap<CorsPolicy>;
+  logPolicies: EntityMap<LogPolicy>;
   upstreamGroups: EntityMap<UpstreamGroup>;
+};
+
+export type LogPolicy = {
+  id: string;
+  domainGroupId: string;
+  name: string;
+  enabled: boolean;
+  retentionTimeSeconds: number;
 };
 
 export type BootstrapReply = {

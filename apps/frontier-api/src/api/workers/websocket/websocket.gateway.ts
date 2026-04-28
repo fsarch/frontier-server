@@ -10,6 +10,7 @@ import { DomainGroupService } from "../../domain-group/domain-group.service";
 import { DomainService } from "../../domain-group/domain/domain.service";
 import { CachePolicyService } from "../../domain-group/cache-policy/cache-policy.service";
 import { CorsPolicyService } from "../../domain-group/cors-policy/cors-policy.service";
+import { LogPolicyService } from "../../domain-group/log-policy/log-policy.service";
 import { UpstreamGroupService } from "../../domain-group/upstream-group/upstream-group.service";
 import { UpstreamService } from "../../domain-group/upstream-group/upstream/upstream.service";
 import { PathRuleService } from "../../domain-group/path-rule/path-rule.service";
@@ -20,6 +21,7 @@ import { PathRule } from "../../../database/entities/path-rule.entity";
 import { DomainGroupDomain } from "../../../database/entities/domain-group-domain.entity";
 import { CachePolicy } from "../../../database/entities/cache-policy.entity";
 import { CorsPolicy } from "../../../database/entities/cors-policy.entity";
+import { LogPolicy } from "../../../database/entities/log-policy.entity";
 import { ModuleConfigurationService } from '../../../fsarch/configuration/module/module-configuration.service';
 import { ConfigWorkersType } from '../../../fsarch/configuration/config.type';
 
@@ -33,6 +35,7 @@ type WorkerConfigSnapshot = {
   domainGroupDomainsByDomain: TEntity<DomainGroupDomain>;
   cachePolicies: TEntity<CachePolicy>;
   corsPolicies: TEntity<CorsPolicy>;
+  logPolicies: TEntity<LogPolicy>;
   upstreamGroups: TEntity<UpstreamGroup & { upstreams: Array<Upstream> }>;
 };
 
@@ -75,6 +78,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
     private readonly domainGroupDomainService: DomainService,
     private readonly cachePolicyService: CachePolicyService,
     private readonly corsPolicyService: CorsPolicyService,
+    private readonly logPolicyService: LogPolicyService,
     private readonly upstreamGroupService: UpstreamGroupService,
     private readonly upstreamService: UpstreamService,
     private readonly pathRuleService: PathRuleService,
@@ -111,6 +115,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
       domainGroupDomains,
       cachePolicies,
       corsPolicies,
+      logPolicies,
       upstreamGroups,
       upstreams,
       pathRules,
@@ -119,6 +124,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
       this.domainGroupDomainService.List(),
       this.cachePolicyService.List(),
       this.corsPolicyService.List(),
+      this.logPolicyService.List(),
       this.upstreamGroupService.List(),
       this.upstreamService.List(),
       this.pathRuleService.List(),
@@ -149,6 +155,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
       domainGroupDomainsByDomain: toEntityGroup(domainGroupDomains, (domainGroupDomain) => domainGroupDomain.domainName),
       cachePolicies: toEntityGroup(cachePolicies, (cachePolicy) => cachePolicy.id),
       corsPolicies: toEntityGroup(corsPolicies, (corsPolicy) => corsPolicy.id),
+      logPolicies: toEntityGroup(logPolicies, (logPolicy) => logPolicy.id),
       upstreamGroups: upstreamGroupsEntity,
     };
   }
