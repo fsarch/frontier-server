@@ -13,9 +13,7 @@ export class PathRuleDto {
     dto.domainGroupId = dbo.domainGroupId;
     dto.upstreamGroupId = dbo.upstreamGroupId;
     dto.order = dbo.order;
-    dto.corsEnabled = dbo.corsEnabled;
-    dto.corsAllowCredentials = dbo.corsAllowCredentials;
-    dto.corsAllowedOrigins = dbo.corsAllowedOrigins ?? [];
+    dto.corsPolicyId = dbo.corsPolicyId ?? null;
 
     return dto;
   }
@@ -42,13 +40,7 @@ export class PathRuleDto {
   order: number;
 
   @ApiProperty({ required: false })
-  corsEnabled: boolean;
-
-  @ApiProperty({ required: false })
-  corsAllowCredentials: boolean;
-
-  @ApiProperty({ required: false, type: [String] })
-  corsAllowedOrigins: string[];
+  corsPolicyId: string | null;
 }
 
 export class PathRuleUpdateDto {
@@ -74,15 +66,7 @@ export class PathRuleUpdateDto {
 
   @ApiProperty({ required: false })
   @Optional()
-  corsEnabled?: boolean;
-
-  @ApiProperty({ required: false })
-  @Optional()
-  corsAllowCredentials?: boolean;
-
-  @ApiProperty({ required: false, type: [String] })
-  @Optional()
-  corsAllowedOrigins?: string[];
+  corsPolicyId?: string | null;
 }
 
 export class PathRuleCreateDto {
@@ -96,9 +80,6 @@ export class PathRuleCreateDto {
   cachePolicyId: string;
 
   @ApiProperty()
-  domainGroupId: string;
-
-  @ApiProperty()
   upstreamGroupId: string;
 
   @ApiProperty()
@@ -107,13 +88,5 @@ export class PathRuleCreateDto {
 
   @ApiProperty({ required: false })
   @Optional()
-  corsEnabled?: boolean;
-
-  @ApiProperty({ required: false })
-  @Optional()
-  corsAllowCredentials?: boolean;
-
-  @ApiProperty({ required: false, type: [String] })
-  @Optional()
-  corsAllowedOrigins?: string[];
+  corsPolicyId?: string | null;
 }

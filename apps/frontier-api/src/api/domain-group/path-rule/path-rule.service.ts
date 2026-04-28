@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import { CorsPolicy } from "../../../database/entities/cors-policy.entity";
 import { PathRule } from "../../../database/entities/path-rule.entity";
 import { PathRuleCreateDto, PathRuleUpdateDto } from "../../../models/path-rule.model";
 
@@ -9,6 +10,8 @@ export class PathRuleService {
   constructor(
     @InjectRepository(PathRule)
     private readonly pathRuleRepository: Repository<PathRule>,
+    @InjectRepository(CorsPolicy)
+    private readonly corsPolicyRepository: Repository<CorsPolicy>,
   ) {
   }
 
@@ -17,17 +20,12 @@ export class PathRuleService {
     domainGroupId: string,
     pathRuleDto: PathRuleCreateDto,
   ) {
-    const normalizedCorsAllowedOrigins = (pathRuleDto.corsAllowedOrigins ?? [])
-      .map((origin) => origin.trim())
-      .filter((origin) => origin.length > 0);
+    await this.ensureCorsPolicyExists(domainGroupId, pathRuleDto.corsPolicyId);
 
     const createdPathRule = this.pathRuleRepository.create({
       id: crypto.randomUUID(),
-      domainGroupId,
       ...pathRuleDto,
-      corsAllowedOrigins: normalizedCorsAllowedOrigins,
-      corsEnabled: pathRuleDto.corsEnabled === true,
-      corsAllowCredentials: pathRuleDto.corsAllowCredentials === true,
+      domainGroupId,
     });
 
     const savedPathRule = await this.pathRuleRepository.save(createdPathRule);
@@ -56,8 +54,8 @@ export class PathRuleService {
     });
   }
 
-  public async GetById(id: string): Promise<PathRule> {
-    const pathRule = await this.pathRuleRepository.findOne({ where: { id } });
+  public async GetById(domainGroupId: string, id: string): Promise<PathRule> {
+    const pathRule = await this.pathRuleRepository.findOne({ where: { id, domainGroupId } });
 
     if (!pathRule) {
       throw new NotFoundException(`PathRule ${id} not found`);
@@ -66,22 +64,34 @@ export class PathRuleService {
     return pathRule;
   }
 
-  public async Update(id: string, dto: PathRuleUpdateDto): Promise<PathRule> {
-    const pathRule = await this.GetById(id);
-
-    if (dto.corsAllowedOrigins !== undefined) {
-      dto.corsAllowedOrigins = dto.corsAllowedOrigins
-        .map((o) => o.trim())
-        .filter((o) => o.length > 0);
-    }
+  public async Update(id: string, domainGroupId: string, dto: PathRuleUpdateDto): Promise<PathRule> {
+    const pathRule = await this.GetById(domainGroupId, id);
+    await this.ensureCorsPolicyExists(domainGroupId, dto.corsPolicyId);
 
     Object.assign(pathRule, dto);
 
     return this.pathRuleRepository.save(pathRule);
   }
 
-  public async Delete(id: string): Promise<void> {
-    const pathRule = await this.GetById(id);
+  public async Delete(id: string, domainGroupId: string): Promise<void> {
+    const pathRule = await this.GetById(domainGroupId, id);
     await this.pathRuleRepository.softDelete(pathRule.id);
+  }
+
+  private async ensureCorsPolicyExists(domainGroupId: string, corsPolicyId: string | null | undefined): Promise<void> {
+    if (!corsPolicyId) {
+      return;
+    }
+
+    const corsPolicy = await this.corsPolicyRepository.findOne({
+      where: {
+        id: corsPolicyId,
+        domainGroupId,
+      },
+    });
+
+    if (!corsPolicy) {
+      throw new NotFoundException(`CorsPolicy ${corsPolicyId} not found`);
+    }
   }
 }

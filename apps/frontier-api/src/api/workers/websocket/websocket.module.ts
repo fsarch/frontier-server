@@ -3,6 +3,7 @@ import { WebsocketGateway } from './websocket.gateway';
 import { DomainModule } from "../../domain-group/domain/domain.module";
 import { DomainGroupModule } from "../../domain-group/domain-group.module";
 import { CachePolicyModule } from "../../domain-group/cache-policy/cache-policy.module";
+import { CorsPolicyModule } from "../../domain-group/cors-policy/cors-policy.module";
 import { UpstreamGroupModule } from "../../domain-group/upstream-group/upstream-group.module";
 import { UpstreamModule } from "../../domain-group/upstream-group/upstream/upstream.module";
 import { PathRuleModule } from "../../domain-group/path-rule/path-rule.module";
@@ -15,6 +16,7 @@ import { WORKERS_CONFIG_VALIDATOR } from './workers-config.validator';
     DomainModule,
     DomainGroupModule,
     CachePolicyModule,
+    CorsPolicyModule,
     UpstreamGroupModule,
     UpstreamModule,
     PathRuleModule,

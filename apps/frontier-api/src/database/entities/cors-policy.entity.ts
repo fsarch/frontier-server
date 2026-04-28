@@ -7,11 +7,11 @@ import {
 } from 'typeorm';
 
 @Entity({
-  name: 'path_rule',
+  name: 'cors_policy',
 })
-export class PathRule {
+export class CorsPolicy {
   @PrimaryGeneratedColumn('uuid', {
-    primaryKeyConstraintName: 'pk_path_rule',
+    primaryKeyConstraintName: 'pk_cors_policy',
   })
   id: string;
 
@@ -30,38 +30,28 @@ export class PathRule {
   name: string;
 
   @Column({
-    name: 'path',
-    length: '2048',
+    name: 'enabled',
+    type: 'boolean',
     nullable: false,
+    default: false,
   })
-  path: string;
+  enabled: boolean;
 
   @Column({
-    name: 'order',
+    name: 'allow_credentials',
+    type: 'boolean',
     nullable: false,
+    default: false,
   })
-  order: number;
+  allowCredentials: boolean;
 
   @Column({
-    name: 'cache_policy_id',
-    type: 'uuid',
+    name: 'allowed_origins',
+    type: 'text',
+    array: true,
     nullable: true,
   })
-  cachePolicyId: string;
-
-  @Column({
-    name: 'upstream_group_id',
-    type: 'uuid',
-    nullable: true,
-  })
-  upstreamGroupId: string;
-
-  @Column({
-    name: 'cors_policy_id',
-    type: 'uuid',
-    nullable: true,
-  })
-  corsPolicyId?: string | null;
+  allowedOrigins?: string[];
 
   @CreateDateColumn({
     name: 'creation_time',
@@ -73,3 +63,4 @@ export class PathRule {
   })
   deletionTime: Date;
 }
+

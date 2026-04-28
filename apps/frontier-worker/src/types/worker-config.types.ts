@@ -11,9 +11,16 @@ export type PathRule = {
   order: number;
   cachePolicyId: string | null;
   upstreamGroupId: string | null;
-  corsEnabled?: boolean;
-  corsAllowCredentials?: boolean;
-  corsAllowedOrigins?: string[];
+  corsPolicyId?: string | null;
+};
+
+export type CorsPolicy = {
+  id: string;
+  domainGroupId: string;
+  name: string;
+  enabled: boolean;
+  allowCredentials: boolean;
+  allowedOrigins?: string[];
 };
 
 export type DomainGroup = {
@@ -48,6 +55,7 @@ export type WorkerConfigSnapshot = {
   domainGroups: EntityMap<DomainGroup>;
   domainGroupDomainsByDomain: EntityMap<DomainGroupDomain>;
   cachePolicies: EntityMap<unknown>;
+  corsPolicies: EntityMap<CorsPolicy>;
   upstreamGroups: EntityMap<UpstreamGroup>;
 };
 

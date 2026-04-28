@@ -1,4 +1,4 @@
-import { PathRule, WorkerConfigSnapshot } from '../types/worker-config.types';
+import { CorsPolicy, WorkerConfigSnapshot } from '../types/worker-config.types';
 
 type CompiledUpstream = {
   host: string;
@@ -184,7 +184,7 @@ export class CompiledWorkerConfig {
         routes.push({
           pathPrefix: pathPattern,
           upstreams,
-          cors: compileCorsPolicy(rule),
+          cors: compileCorsPolicy(rule.corsPolicyId ? this.snapshot.corsPolicies.entities[rule.corsPolicyId] : undefined),
           cursor: 0,
         });
       }
@@ -328,12 +328,12 @@ function isDebugEnabled(value: string | undefined): boolean {
   return value === '1' || value.toLowerCase() === 'true' || value.toLowerCase() === 'debug';
 }
 
-function compileCorsPolicy(rule: PathRule): CompiledCorsPolicy {
-  const enabled = rule.corsEnabled === true;
-  const allowCredentials = enabled && rule.corsAllowCredentials === true;
+function compileCorsPolicy(policy: CorsPolicy | undefined): CompiledCorsPolicy {
+  const enabled = policy?.enabled === true;
+  const allowCredentials = enabled && policy?.allowCredentials === true;
   const allowedOrigins = new Set<string>();
 
-  for (const origin of rule.corsAllowedOrigins ?? []) {
+  for (const origin of policy?.allowedOrigins ?? []) {
     const normalizedOrigin = origin.trim();
 
     if (!normalizedOrigin) {

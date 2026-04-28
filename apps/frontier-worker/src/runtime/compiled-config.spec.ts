@@ -46,6 +46,10 @@ function createSnapshot(): WorkerConfigSnapshot {
       ids: [],
       entities: {},
     },
+    corsPolicies: {
+      ids: [],
+      entities: {},
+    },
     upstreamGroups: {
       ids: ['ug-1', 'ug-2'],
       entities: {
@@ -301,11 +305,22 @@ describe('CompiledWorkerConfig', () => {
         order: 1,
         cachePolicyId: null,
         upstreamGroupId: 'ug-1',
-        corsEnabled: true,
-        corsAllowCredentials: true,
-        corsAllowedOrigins: ['https://app.example.com', '*'],
+        corsPolicyId: 'cp-1',
       },
     ];
+    snapshot.corsPolicies = {
+      ids: ['cp-1'],
+      entities: {
+        'cp-1': {
+          id: 'cp-1',
+          domainGroupId: 'dg-1',
+          name: 'frontend-app',
+          enabled: true,
+          allowCredentials: true,
+          allowedOrigins: ['https://app.example.com', '*'],
+        },
+      },
+    };
 
     const config = new CompiledWorkerConfig(snapshot);
     const route = config.resolve('example.com', '/api/users');

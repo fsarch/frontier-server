@@ -48,9 +48,10 @@ export class PathRuleController {
   @UseGuards(AuthGuard)
   @Roles(Role.manage)
   public async GetById(
+    @Param('domainGroupId') domainGroupId: string,
     @Param('id') id: string,
   ) {
-    const pathRule = await this.pathRuleService.GetById(id);
+    const pathRule = await this.pathRuleService.GetById(domainGroupId, id);
     return PathRuleDto.FromDbo(pathRule);
   }
 
@@ -58,10 +59,11 @@ export class PathRuleController {
   @UseGuards(AuthGuard)
   @Roles(Role.manage)
   public async Update(
+    @Param('domainGroupId') domainGroupId: string,
     @Param('id') id: string,
     @Body() pathRuleUpdateDto: PathRuleUpdateDto,
   ) {
-    const updated = await this.pathRuleService.Update(id, pathRuleUpdateDto);
+    const updated = await this.pathRuleService.Update(id, domainGroupId, pathRuleUpdateDto);
     return PathRuleDto.FromDbo(updated);
   }
 
@@ -70,8 +72,9 @@ export class PathRuleController {
   @UseGuards(AuthGuard)
   @Roles(Role.manage)
   public async Delete(
+    @Param('domainGroupId') domainGroupId: string,
     @Param('id') id: string,
   ) {
-    await this.pathRuleService.Delete(id);
+    await this.pathRuleService.Delete(id, domainGroupId);
   }
 }
