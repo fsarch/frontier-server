@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CorsPolicy } from '../../../database/entities/cors-policy.entity';
-import { CorsPolicyCreateDto, CorsPolicyUpdateDto } from '../../../models/cors-policy.model';
-import { PathRule } from '../../../database/entities/path-rule.entity';
+import { CorsPolicy } from '../../../database/entities/cors-policy.entity.js';
+import { CorsPolicyCreateDto, CorsPolicyUpdateDto } from '../../../models/cors-policy.model.js';
+import { PathRule } from '../../../database/entities/path-rule.entity.js';
 
 @Injectable()
 export class CorsPolicyService {

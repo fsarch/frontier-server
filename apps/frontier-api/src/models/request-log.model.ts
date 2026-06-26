@@ -1,6 +1,6 @@
 import { Optional } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
-import { RequestLog } from '../database/entities/request-log.entity';
+import { RequestLog } from '../database/entities/request-log.entity.js';
 
 export class RequestLogDto {
   static FromDbo(dbo: RequestLog) {

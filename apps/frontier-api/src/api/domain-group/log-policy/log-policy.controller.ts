@@ -1,10 +1,10 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AuthGuard } from '../../../fsarch/auth/guards/auth.guard';
-import { Roles } from '../../../fsarch/uac/decorators/roles.decorator';
-import { Role } from '../../../fsarch/auth/role.enum';
-import { LogPolicyService } from './log-policy.service';
-import { LogPolicyCreateDto, LogPolicyDto, LogPolicyUpdateDto } from '../../../models/log-policy.model';
+import { AuthGuard } from '../../../fsarch/auth/guards/auth.guard.js';
+import { Roles } from '../../../fsarch/uac/decorators/roles.decorator.js';
+import { Role } from '../../../fsarch/auth/role.enum.js';
+import { LogPolicyService } from './log-policy.service.js';
+import { LogPolicyCreateDto, LogPolicyDto, LogPolicyUpdateDto } from '../../../models/log-policy.model.js';
 
 @ApiTags('log-policies')
 @Controller({

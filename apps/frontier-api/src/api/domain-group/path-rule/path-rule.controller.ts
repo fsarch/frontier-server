@@ -1,10 +1,10 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import { AuthGuard } from "../../../fsarch/auth/guards/auth.guard";
-import { Roles } from "../../../fsarch/uac/decorators/roles.decorator";
-import { Role } from "../../../fsarch/auth/role.enum";
-import { PathRuleService } from "./path-rule.service";
-import { PathRuleCreateDto, PathRuleDto, PathRuleUpdateDto } from "../../../models/path-rule.model";
+import { AuthGuard } from "../../../fsarch/auth/guards/auth.guard.js";
+import { Roles } from "../../../fsarch/uac/decorators/roles.decorator.js";
+import { Role } from "../../../fsarch/auth/role.enum.js";
+import { PathRuleService } from "./path-rule.service.js";
+import { PathRuleCreateDto, PathRuleDto, PathRuleUpdateDto } from "../../../models/path-rule.model.js";
 
 @ApiTags('path-rules')
 @Controller({

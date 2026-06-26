@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
-import { DomainGroupCreateDto, DomainGroupDto } from "../../models/domain-group.model";
+import { DomainGroupCreateDto, DomainGroupDto } from "../../models/domain-group.model.js";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import { AuthGuard } from "../../fsarch/auth/guards/auth.guard";
-import { Roles } from "../../fsarch/uac/decorators/roles.decorator";
-import { Role } from "../../fsarch/auth/role.enum";
-import { DomainGroupService } from "./domain-group.service";
+import { AuthGuard } from "../../fsarch/auth/guards/auth.guard.js";
+import { Roles } from "../../fsarch/uac/decorators/roles.decorator.js";
+import { Role } from "../../fsarch/auth/role.enum.js";
+import { DomainGroupService } from "./domain-group.service.js";
 
 @ApiTags('domain-groups')
 @Controller({

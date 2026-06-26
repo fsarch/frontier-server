@@ -1,6 +1,6 @@
 import { Optional } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
-import { CorsPolicy } from '../database/entities/cors-policy.entity';
+import { CorsPolicy } from '../database/entities/cors-policy.entity.js';
 
 export class CorsPolicyDto {
   static FromDbo(dbo: CorsPolicy) {

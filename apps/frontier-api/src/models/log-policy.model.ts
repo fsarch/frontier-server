@@ -1,6 +1,6 @@
 import { Optional } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
-import { LogPolicy } from '../database/entities/log-policy.entity';
+import { LogPolicy } from '../database/entities/log-policy.entity.js';
 
 export class LogPolicyDto {
   static FromDbo(dbo: LogPolicy) {

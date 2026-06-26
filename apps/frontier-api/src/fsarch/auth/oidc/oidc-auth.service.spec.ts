@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { OidcAuthService } from './oidc-auth.service.js';
+import { OidcAuthService } from './oidc-auth.service';
 
 describe('OidcService', () => {
   let service: OidcAuthService;

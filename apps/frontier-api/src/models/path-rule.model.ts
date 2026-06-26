@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { PathRule } from "../database/entities/path-rule.entity";
+import { PathRule } from "../database/entities/path-rule.entity.js";
 import { Optional } from "@nestjs/common";
 
 export class PathRuleDto {

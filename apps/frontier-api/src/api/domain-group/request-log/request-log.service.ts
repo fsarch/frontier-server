@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Between, FindOptionsWhere, LessThan, MoreThan, Repository } from 'typeorm';
-import { RequestLog } from '../../../database/entities/request-log.entity';
-import { RequestLogQueryDto, WorkerRequestLogCreateDto } from '../../../models/request-log.model';
-import { LogPolicy } from '../../../database/entities/log-policy.entity';
+import { RequestLog } from '../../../database/entities/request-log.entity.js';
+import { RequestLogQueryDto, WorkerRequestLogCreateDto } from '../../../models/request-log.model.js';
+import { LogPolicy } from '../../../database/entities/log-policy.entity.js';
 
 @Injectable()
 export class RequestLogService {

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PinoLogger } from './pino-logger.service.js';
+import { PinoLogger } from './pino-logger.service';
 
 describe('LoggerService', () => {
   let service: PinoLogger;

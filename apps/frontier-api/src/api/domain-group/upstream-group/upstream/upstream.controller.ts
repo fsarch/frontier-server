@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import { AuthGuard } from "../../../../fsarch/auth/guards/auth.guard";
-import { Roles } from "../../../../fsarch/uac/decorators/roles.decorator";
-import { Role } from "../../../../fsarch/auth/role.enum";
-import { UpstreamService } from "./upstream.service";
-import { UpstreamCreateDto, UpstreamDto } from "../../../../models/upstream.model";
+import { AuthGuard } from "../../../../fsarch/auth/guards/auth.guard.js";
+import { Roles } from "../../../../fsarch/uac/decorators/roles.decorator.js";
+import { Role } from "../../../../fsarch/auth/role.enum.js";
+import { UpstreamService } from "./upstream.service.js";
+import { UpstreamCreateDto, UpstreamDto } from "../../../../models/upstream.model.js";
 
 @ApiTags('upstream')
 @Controller({

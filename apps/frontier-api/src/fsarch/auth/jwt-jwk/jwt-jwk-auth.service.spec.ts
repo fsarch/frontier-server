@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { JwtJwkAuthService } from './jwt-jwk-auth.service.js';
+import { JwtJwkAuthService } from './jwt-jwk-auth.service';
 
 describe('JwtJwkService', () => {
   let service: JwtJwkAuthService;

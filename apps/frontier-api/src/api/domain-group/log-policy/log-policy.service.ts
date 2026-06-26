@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { LogPolicy } from '../../../database/entities/log-policy.entity';
-import { LogPolicyCreateDto, LogPolicyUpdateDto } from '../../../models/log-policy.model';
-import { PathRule } from '../../../database/entities/path-rule.entity';
+import { LogPolicy } from '../../../database/entities/log-policy.entity.js';
+import { LogPolicyCreateDto, LogPolicyUpdateDto } from '../../../models/log-policy.model.js';
+import { PathRule } from '../../../database/entities/path-rule.entity.js';
 
 @Injectable()
 export class LogPolicyService {

@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { DomainGroup } from "../database/entities/domain-group.entity";
+import { DomainGroup } from "../database/entities/domain-group.entity.js";
 
 export class DomainGroupDto {
   static FromDbo(dbo: DomainGroup) {

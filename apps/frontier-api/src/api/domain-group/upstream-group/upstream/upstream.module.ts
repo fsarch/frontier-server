@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { UpstreamService } from './upstream.service';
-import { UpstreamController } from './upstream.controller';
+import { UpstreamService } from './upstream.service.js';
+import { UpstreamController } from './upstream.controller.js';
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { Upstream } from "../../../../database/entities/upstream.entity";
+import { Upstream } from "../../../../database/entities/upstream.entity.js";
 
 @Module({
   providers: [UpstreamService],

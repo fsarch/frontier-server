@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { CachePolicy } from "../database/entities/cache-policy.entity";
+import { CachePolicy } from "../database/entities/cache-policy.entity.js";
 import { Optional } from "@nestjs/common";
 
 export class CachePolicyDto {

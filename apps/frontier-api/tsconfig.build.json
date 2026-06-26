@@ -1,5 +1,8 @@
 {
   "extends": "./tsconfig.json",
   "exclude": [
-    "../../frontier/node_modules", "test", "dist", "**/*spec.ts"]
+    "../../frontier/node_modules", "test", "dist", "**/*spec.ts"],
+  "compilerOptions": {
+    "incremental": false
+  }
 }

@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { Upstream } from "../database/entities/upstream.entity";
+import { Upstream } from "../database/entities/upstream.entity.js";
 
 export class UpstreamDto {
   static FromDbo(dbo: Upstream) {

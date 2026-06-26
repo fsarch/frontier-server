@@ -1,6 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { DomainGroup } from "../database/entities/domain-group.entity";
-import { UpstreamGroup } from "../database/entities/upstream-group.entity";
+import { DomainGroup } from "../database/entities/domain-group.entity.js";
+import { UpstreamGroup } from "../database/entities/upstream-group.entity.js";
 
 export class UpstreamGroupDto {
   static FromDbo(dbo: UpstreamGroup) {

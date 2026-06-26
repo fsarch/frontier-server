@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { UpstreamGroupService } from './upstream-group.service';
-import { UpstreamGroupController } from './upstream-group.controller';
+import { UpstreamGroupService } from './upstream-group.service.js';
+import { UpstreamGroupController } from './upstream-group.controller.js';
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { UpstreamGroup } from "../../../database/entities/upstream-group.entity";
-import { UpstreamModule } from './upstream/upstream.module';
+import { UpstreamGroup } from "../../../database/entities/upstream-group.entity.js";
+import { UpstreamModule } from './upstream/upstream.module.js';
 
 @Module({
   providers: [UpstreamGroupService],

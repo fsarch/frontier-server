@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import { AuthGuard } from "../../../fsarch/auth/guards/auth.guard";
-import { Roles } from "../../../fsarch/uac/decorators/roles.decorator";
-import { Role } from "../../../fsarch/auth/role.enum";
-import { CachePolicyService } from "./cache-policy.service";
-import { CachePolicyCreateDto, CachePolicyDto, CachePolicyUpdateDto } from "../../../models/cache-policy.model";
+import { AuthGuard } from "../../../fsarch/auth/guards/auth.guard.js";
+import { Roles } from "../../../fsarch/uac/decorators/roles.decorator.js";
+import { Role } from "../../../fsarch/auth/role.enum.js";
+import { CachePolicyService } from "./cache-policy.service.js";
+import { CachePolicyCreateDto, CachePolicyDto, CachePolicyUpdateDto } from "../../../models/cache-policy.model.js";
 
 @ApiTags('cache-policies')
 @Controller({

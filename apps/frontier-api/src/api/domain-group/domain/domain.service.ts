@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { DomainGroupDomainCreateDto, DomainGroupDomainDto } from "../../../models/domain-group-domain.model";
+import { DomainGroupDomainCreateDto, DomainGroupDomainDto } from "../../../models/domain-group-domain.model.js";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import { DomainGroupDomain } from "../../../database/entities/domain-group-domain.entity";
+import { DomainGroupDomain } from "../../../database/entities/domain-group-domain.entity.js";
 
 @Injectable()
 export class DomainService {

@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { CachePolicyCreateDto, CachePolicyUpdateDto } from "../../../models/cache-policy.model";
+import { CachePolicyCreateDto, CachePolicyUpdateDto } from "../../../models/cache-policy.model.js";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import { CachePolicy } from "../../../database/entities/cache-policy.entity";
-import { DomainGroupDomainCreateDto } from "../../../models/domain-group-domain.model";
+import { CachePolicy } from "../../../database/entities/cache-policy.entity.js";
+import { DomainGroupDomainCreateDto } from "../../../models/domain-group-domain.model.js";
 
 @Injectable()
 export class CachePolicyService {

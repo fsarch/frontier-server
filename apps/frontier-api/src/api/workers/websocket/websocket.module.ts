@@ -1,17 +1,17 @@
 import { Module } from '@nestjs/common';
-import { WebsocketGateway } from './websocket.gateway';
-import { DomainModule } from "../../domain-group/domain/domain.module";
-import { DomainGroupModule } from "../../domain-group/domain-group.module";
-import { CachePolicyModule } from "../../domain-group/cache-policy/cache-policy.module";
-import { CorsPolicyModule } from "../../domain-group/cors-policy/cors-policy.module";
-import { LogPolicyModule } from "../../domain-group/log-policy/log-policy.module";
-import { RequestLogModule } from '../../domain-group/request-log/request-log.module';
-import { UpstreamGroupModule } from "../../domain-group/upstream-group/upstream-group.module";
-import { UpstreamModule } from "../../domain-group/upstream-group/upstream/upstream.module";
-import { PathRuleModule } from "../../domain-group/path-rule/path-rule.module";
-import { ModuleConfiguration } from "../../../fsarch/configuration/module/module-configuration.module";
-import { WORKERS_CONFIG_VALIDATOR } from './workers-config.validator';
-import { WorkerLogController } from './worker-log.controller';
+import { WebsocketGateway } from './websocket.gateway.js';
+import { DomainModule } from "../../domain-group/domain/domain.module.js";
+import { DomainGroupModule } from "../../domain-group/domain-group.module.js";
+import { CachePolicyModule } from "../../domain-group/cache-policy/cache-policy.module.js";
+import { CorsPolicyModule } from "../../domain-group/cors-policy/cors-policy.module.js";
+import { LogPolicyModule } from "../../domain-group/log-policy/log-policy.module.js";
+import { RequestLogModule } from '../../domain-group/request-log/request-log.module.js';
+import { UpstreamGroupModule } from "../../domain-group/upstream-group/upstream-group.module.js";
+import { UpstreamModule } from "../../domain-group/upstream-group/upstream/upstream.module.js";
+import { PathRuleModule } from "../../domain-group/path-rule/path-rule.module.js";
+import { ModuleConfiguration } from "../../../fsarch/configuration/module/module-configuration.module.js";
+import { WORKERS_CONFIG_VALIDATOR } from './workers-config.validator.js';
+import { WorkerLogController } from './worker-log.controller.js';
 
 @Module({
   providers: [WebsocketGateway],

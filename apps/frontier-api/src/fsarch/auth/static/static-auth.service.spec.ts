@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { StaticAuthService } from './static-auth.service.js';
+import { StaticAuthService } from './static-auth.service';
 
 describe('LocalAuthService', () => {
   let service: StaticAuthService;

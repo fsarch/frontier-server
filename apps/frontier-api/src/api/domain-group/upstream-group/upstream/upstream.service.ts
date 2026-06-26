@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import { Upstream } from "../../../../database/entities/upstream.entity";
-import { PathRuleCreateDto } from "../../../../models/path-rule.model";
-import { UpstreamCreateDto } from "../../../../models/upstream.model";
+import { Upstream } from "../../../../database/entities/upstream.entity.js";
+import { PathRuleCreateDto } from "../../../../models/path-rule.model.js";
+import { UpstreamCreateDto } from "../../../../models/upstream.model.js";
 
 @Injectable()
 export class UpstreamService {

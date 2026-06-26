@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { FrontierApiService } from './frontier-api.service';
+import { FrontierApiService } from './frontier-api.service.js';
 
 @Controller()
 export class FrontierApiController {

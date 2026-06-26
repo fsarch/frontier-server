@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { CachePolicyService } from './cache-policy.service';
-import { CachePolicyController } from './cache-policy.controller';
+import { CachePolicyService } from './cache-policy.service.js';
+import { CachePolicyController } from './cache-policy.controller.js';
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { CachePolicy } from "../../../database/entities/cache-policy.entity";
+import { CachePolicy } from "../../../database/entities/cache-policy.entity.js";
 
 @Module({
   providers: [CachePolicyService],

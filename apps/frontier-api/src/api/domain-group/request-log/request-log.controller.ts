@@ -1,10 +1,10 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AuthGuard } from '../../../fsarch/auth/guards/auth.guard';
-import { Roles } from '../../../fsarch/uac/decorators/roles.decorator';
-import { Role } from '../../../fsarch/auth/role.enum';
-import { RequestLogService } from './request-log.service';
-import { RequestLogDto, RequestLogQueryDto } from '../../../models/request-log.model';
+import { AuthGuard } from '../../../fsarch/auth/guards/auth.guard.js';
+import { Roles } from '../../../fsarch/uac/decorators/roles.decorator.js';
+import { Role } from '../../../fsarch/auth/role.enum.js';
+import { RequestLogService } from './request-log.service.js';
+import { RequestLogDto, RequestLogQueryDto } from '../../../models/request-log.model.js';
 
 @ApiTags('request-logs')
 @Controller({
