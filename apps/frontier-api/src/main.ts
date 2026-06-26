@@ -1,6 +1,6 @@
 import { FrontierApiModule } from "./frontier-api.module.js";
 import { WsAdapter } from '@nestjs/platform-ws';
-import { FsArchAppBuilder } from "./fsarch/FsArchApp.js";
+import { FsArchAppBuilder } from "@fsarch/server";
 import { DATABASE_OPTIONS } from "./database/index.js";
 
 async function bootstrap() {

@@ -2,9 +2,9 @@ import { Body, Controller, Headers, HttpCode, HttpException, HttpStatus, Post, V
 import { RequestLogService } from '../../domain-group/request-log/request-log.service.js';
 import { WorkerRequestLogCreateDto } from '../../../models/request-log.model.js';
 import { Inject } from '@nestjs/common';
-import { ModuleConfigurationService } from '../../../fsarch/configuration/module/module-configuration.service.js';
-import { ConfigWorkersType } from '../../../fsarch/configuration/config.type.js';
-import { Public } from '../../../fsarch/auth/decorators/public.decorator.js';
+import { ModuleConfigurationService } from '@fsarch/server/configuration';
+import { Public } from '@fsarch/server/auth';
+import { ConfigWorkersType } from "../../../types/config.type";
 
 @Controller({
   path: 'api/workers/logs',

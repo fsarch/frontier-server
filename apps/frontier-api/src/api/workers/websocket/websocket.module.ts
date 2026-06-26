@@ -9,7 +9,7 @@ import { RequestLogModule } from '../../domain-group/request-log/request-log.mod
 import { UpstreamGroupModule } from "../../domain-group/upstream-group/upstream-group.module.js";
 import { UpstreamModule } from "../../domain-group/upstream-group/upstream/upstream.module.js";
 import { PathRuleModule } from "../../domain-group/path-rule/path-rule.module.js";
-import { ModuleConfiguration } from "../../../fsarch/configuration/module/module-configuration.module.js";
+import { ModuleConfiguration } from "@fsarch/server/configuration";
 import { WORKERS_CONFIG_VALIDATOR } from './workers-config.validator.js';
 import { WorkerLogController } from './worker-log.controller.js';
 
