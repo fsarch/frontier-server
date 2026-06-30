@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { PathRule } from "../database/entities/path-rule.entity.js";
+import { Hook } from "../database/entities/hook.entity.js";
 import { Optional } from "@nestjs/common";
 
 export class PathRuleDto {
@@ -15,6 +16,8 @@ export class PathRuleDto {
     dto.order = dbo.order;
     dto.corsPolicyId = dbo.corsPolicyId ?? null;
     dto.logPolicyId = dbo.logPolicyId ?? null;
+    dto.preHookId = dbo.preHookId ?? null;
+    dto.postHookId = dbo.postHookId ?? null;
 
     return dto;
   }
@@ -45,6 +48,12 @@ export class PathRuleDto {
 
   @ApiProperty({ required: false })
   logPolicyId: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  preHookId: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  postHookId: string | null;
 }
 
 export class PathRuleUpdateDto {
@@ -75,6 +84,14 @@ export class PathRuleUpdateDto {
   @ApiProperty({ required: false })
   @Optional()
   logPolicyId?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Optional()
+  preHookId?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Optional()
+  postHookId?: string | null;
 }
 
 export class PathRuleCreateDto {
@@ -101,4 +118,12 @@ export class PathRuleCreateDto {
   @ApiProperty({ required: false })
   @Optional()
   logPolicyId?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Optional()
+  preHookId?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Optional()
+  postHookId?: string | null;
 }

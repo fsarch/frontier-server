@@ -30,3 +30,21 @@ remote-events:
   hosts:
     - 127.0.0.1:8080
     - 127.0.0.1:3000
+
+function_server:
+  type: 'remote'
+  url: 'http://127.0.0.1:8081'
+  auth:
+    type: 'openid-client-credentials'
+    token_endpoint: ''
+    client_id: ''
+    client_secret: ''
+
+function_worker:
+  type: 'remote'
+  url: 'http://127.0.0.1:8082'
+  auth:
+    type: 'openid-client-credentials'
+    token_endpoint: ''
+    client_id: ''
+    client_secret: ''

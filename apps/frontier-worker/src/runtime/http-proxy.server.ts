@@ -1,8 +1,9 @@
 import { createServer, IncomingHttpHeaders, IncomingMessage, Server, ServerResponse } from 'http';
 import { pipeline } from 'stream/promises';
 import { request as proxyRequest } from 'undici';
-import { buildUpstreamPath, CompiledWorkerConfig } from './compiled-config';
+import { buildUpstreamPath, CompiledWorkerConfig, CompiledHooks } from './compiled-config';
 import { WorkerConfigSnapshot } from '../types/worker-config.types';
+import { FunctionClient, FunctionServerConfig } from './function-client.js';
 
 type Metrics = {
   startedAt: number;
@@ -33,6 +34,21 @@ export type RequestLogPayload = {
 
 type HttpProxyServerOptions = {
   onRequestLog?: (payload: RequestLogPayload) => Promise<void>;
+  functionClient?: FunctionClient;
+  functionConfigs?: Record<string, FunctionServerConfig>;
+};
+
+type HookRequestData = {
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+  body?: unknown;
+};
+
+type HookResponse = {
+  statusCode: number;
+  headers: Record<string, string>;
+  body: unknown;
 };
 
 const HOP_BY_HOP_HEADERS = new Set([
@@ -59,16 +75,24 @@ export class HttpProxyServer {
   private activeVersion = 0;
   private hasPrintedInitialRoutes = false;
   private server: Server;
+  private functionClient: FunctionClient | null = null;
+  private functionConfigs: Record<string, FunctionServerConfig> = {};
 
   constructor(
     private readonly port: number,
     private readonly options?: HttpProxyServerOptions,
   ) {
     this.server = createServer(this.handleRequest.bind(this));
+    if (options?.functionClient) {
+      this.functionClient = options.functionClient;
+    }
+    if (options?.functionConfigs) {
+      this.functionConfigs = options.functionConfigs;
+    }
   }
 
   public setSnapshot(version: number, snapshot: WorkerConfigSnapshot) {
-    this.activeConfig = new CompiledWorkerConfig(snapshot);
+    this.activeConfig = new CompiledWorkerConfig(snapshot, this.functionConfigs);
     this.activeVersion = version;
 
     if (!this.hasPrintedInitialRoutes) {
@@ -149,7 +173,7 @@ export class HttpProxyServer {
       }
 
       const upstreamPath = buildUpstreamPath(route.upstream.basePath, route.pathPrefix, requestUrl.pathname);
-      const upstreamUrl = `http://${route.upstream.host}:${route.upstream.port}${upstreamPath}${requestUrl.search}`;
+      upstreamUrl = `http://${route.upstream.host}:${route.upstream.port}${upstreamPath}${requestUrl.search}`;
       upstreamHeaders = buildRequestHeaders(req.headers);
       const requestOrigin = getSingleHeaderValue(req.headers.origin);
       upstreamMethod = method;
@@ -205,21 +229,131 @@ export class HttpProxyServer {
       this.debug(`resolved request host=${hostHeader ?? '<missing>'} path=${requestUrl.pathname} routePrefix=${route.pathPrefix} upstream=${upstreamUrl}`);
       this.debug(`upstream request method=${method} url=${upstreamUrl}`);
 
-      const upstreamRes = await proxyRequest(upstreamUrl, {
-        method,
+      // Read the request body for hook processing
+      const requestBody = method === 'GET' || method === 'HEAD' ? undefined : await this.readRequestBody(req);
+
+      // Prepare hook request data
+      const hookRequestData: HookRequestData = {
+        method: method,
+        url: upstreamUrl,
         headers: upstreamHeaders,
-        body: method === 'GET' || method === 'HEAD' ? undefined : req,
+        body: requestBody,
+      };
+
+      // Execute pre-hooks if available
+      let modifiedRequest = hookRequestData;
+      let shortCircuitResponse: { statusCode: number; headers: Record<string, string>; body: unknown } | undefined;
+
+      if (this.functionClient && route.preHooks.enabled && route.preHooks.functions.length > 0) {
+        this.debug(`executing pre-hooks for route: ${route.pathRuleId}`);
+        try {
+          const preHookResult = await this.functionClient.executePreHooks(
+            route.preHooks,
+            hookRequestData
+          );
+          modifiedRequest = preHookResult.modifiedRequest;
+          shortCircuitResponse = preHookResult.shortCircuitResponse;
+        } catch (error) {
+          this.debug(`pre-hook execution failed: ${error}`);
+          // If pre-hook execution fails, return error response
+          res.writeHead(500, { 'content-type': 'application/json' }).end(
+            JSON.stringify({ error: `Pre-hook execution failed: ${error instanceof Error ? error.message : String(error)}` })
+          );
+          await this.reportRequestLog(route, {
+            incomingMethod: method,
+            incomingUrl,
+            incomingHeaders: req.headers,
+            upstreamMethod: method,
+            upstreamUrl,
+            upstreamHeaders,
+            responseStatusCode: 500,
+            requestTimeMs: Date.now() - requestStartedAt,
+          });
+          return;
+        }
+      }
+
+      // If pre-hook returned a short-circuit response, send it directly
+      if (shortCircuitResponse) {
+        this.debug(`short-circuit response from pre-hook, status=${shortCircuitResponse.statusCode}`);
+        const responseHeaders = { ...shortCircuitResponse.headers };
+        if (route.cors.enabled && requestOrigin) {
+          Object.assign(responseHeaders, buildCorsHeaders(route.cors, requestOrigin));
+        }
+        res.writeHead(shortCircuitResponse.statusCode, responseHeaders);
+        res.end(JSON.stringify(shortCircuitResponse.body));
+
+        await this.reportRequestLog(route, {
+          incomingMethod: method,
+          incomingUrl,
+          incomingHeaders: req.headers,
+          upstreamMethod: method,
+          upstreamUrl,
+          upstreamHeaders,
+          responseStatusCode: shortCircuitResponse.statusCode,
+          requestTimeMs: Date.now() - requestStartedAt,
+        });
+        return;
+      }
+
+      // Execute upstream request with potentially modified request data
+      const upstreamRes = await proxyRequest(upstreamUrl, {
+        method: modifiedRequest.method,
+        headers: modifiedRequest.headers,
+        body: modifiedRequest.body !== undefined
+          ? (typeof modifiedRequest.body === 'string'
+            ? modifiedRequest.body
+            : JSON.stringify(modifiedRequest.body))
+          : undefined,
       });
+
+      // Read upstream response body
+      let upstreamResponseBody: unknown;
+      try {
+        upstreamResponseBody = await upstreamRes.body.json();
+      } catch {
+        upstreamResponseBody = await upstreamRes.body.text();
+      }
+
+      // Prepare upstream response for hook processing
+      const upstreamResponseData = {
+        statusCode: upstreamRes.statusCode,
+        headers: upstreamRes.headers as Record<string, string>,
+        body: upstreamResponseBody,
+      };
+
+      // Execute post-hooks if available
+      let finalResponse = upstreamResponseData;
+      if (this.functionClient && route.postHooks.enabled && route.postHooks.functions.length > 0) {
+        this.debug(`executing post-hooks for route: ${route.pathRuleId}`);
+        try {
+          finalResponse = await this.functionClient.executePostHooks(
+            route.postHooks,
+            hookRequestData,
+            upstreamResponseData
+          );
+        } catch (error) {
+          this.debug(`post-hook execution failed: ${error}`);
+          console.error('[worker][hooks] post-hook execution failed:', error);
+          // Continue with original upstream response on post-hook failure
+        }
+      }
 
       const responseHeaders = buildResponseHeaders(upstreamRes.headers as IncomingHttpHeaders);
       if (route.cors.enabled && requestOrigin) {
         Object.assign(responseHeaders, buildCorsHeaders(route.cors, requestOrigin));
       }
-      this.debug(`upstream response status=${upstreamRes.statusCode} upstream=${upstreamUrl}`);
-      res.writeHead(upstreamRes.statusCode, responseHeaders);
 
-      if (upstreamRes.body) {
-        await pipeline(upstreamRes.body, res);
+      // Apply modified headers from post-hooks if present
+      if (finalResponse.headers) {
+        Object.assign(responseHeaders, finalResponse.headers);
+      }
+
+      this.debug(`upstream response status=${finalResponse.statusCode} upstream=${upstreamUrl}`);
+      res.writeHead(finalResponse.statusCode, responseHeaders);
+
+      if (finalResponse.body) {
+        res.end(JSON.stringify(finalResponse.body));
       } else {
         res.end();
       }
@@ -228,10 +362,10 @@ export class HttpProxyServer {
         incomingMethod: method,
         incomingUrl,
         incomingHeaders: req.headers,
-        upstreamMethod: method,
+        upstreamMethod: modifiedRequest.method,
         upstreamUrl,
-        upstreamHeaders,
-        responseStatusCode: upstreamRes.statusCode,
+        upstreamHeaders: modifiedRequest.headers,
+        responseStatusCode: finalResponse.statusCode,
         requestTimeMs: Date.now() - requestStartedAt,
       });
     } catch (error) {
@@ -291,6 +425,40 @@ export class HttpProxyServer {
     }
 
     console.debug(`[worker][proxy] ${message}`);
+  }
+
+  private async readRequestBody(req: IncomingMessage): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      const chunks: Uint8Array[] = [];
+
+      req.on('data', (chunk) => {
+        chunks.push(chunk);
+      });
+
+      req.on('end', () => {
+        try {
+          const body = Buffer.concat(chunks);
+          if (body.length === 0) {
+            resolve(undefined);
+            return;
+          }
+
+          // Try to parse as JSON, fall back to raw string
+          try {
+            const parsed = JSON.parse(body.toString('utf-8'));
+            resolve(parsed);
+          } catch {
+            resolve(body.toString('utf-8'));
+          }
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      req.on('error', (error) => {
+        reject(error);
+      });
+    });
   }
 
   private printInitialRoutes(version: number, config: CompiledWorkerConfig) {

@@ -2,6 +2,7 @@ import { CachePolicy } from "./entities/cache-policy.entity.js";
 import { CorsPolicy } from "./entities/cors-policy.entity.js";
 import { DomainGroup } from "./entities/domain-group.entity.js";
 import { DomainGroupDomain } from "./entities/domain-group-domain.entity.js";
+import { Hook } from "./entities/hook.entity.js";
 import { LogPolicy } from "./entities/log-policy.entity.js";
 import { PathRule } from "./entities/path-rule.entity.js";
 import { RequestLog } from "./entities/request-log.entity.js";
@@ -12,6 +13,7 @@ import { AddCorsPolicyTable1777326431513 } from "./migrations/1777326431513-add-
 import {
   AddLogPolicyAndRequestLog1777413549156
 } from "./migrations/1777413549156-add-log-policy-and-request-log.js";
+import { AddHookTableAndPathRuleHookIds1782845914875 } from "./migrations/1782845914875-add-hook-table-and-path-rule-hook-ids";
 
 export const DATABASE_OPTIONS = {
   entities: [
@@ -19,6 +21,7 @@ export const DATABASE_OPTIONS = {
     CorsPolicy,
     DomainGroup,
     DomainGroupDomain,
+    Hook,
     LogPolicy,
     PathRule,
     RequestLog,
@@ -29,5 +32,6 @@ export const DATABASE_OPTIONS = {
     BaseTables1720373216667,
     AddCorsPolicyTable1777326431513,
     AddLogPolicyAndRequestLog1777413549156,
+    AddHookTableAndPathRuleHookIds1782845914875,
   ],
 };

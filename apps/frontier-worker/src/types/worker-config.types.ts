@@ -3,6 +3,12 @@ export type EntityMap<T> = {
   ids: string[];
 };
 
+export type Hook = {
+  id: string;
+  name: string;
+  functionId: string;
+};
+
 export type PathRule = {
   id: string;
   domainGroupId: string;
@@ -13,6 +19,8 @@ export type PathRule = {
   upstreamGroupId: string | null;
   corsPolicyId?: string | null;
   logPolicyId?: string | null;
+  preHookId?: string | null;
+  postHookId?: string | null;
 };
 
 export type CorsPolicy = {
@@ -59,6 +67,7 @@ export type WorkerConfigSnapshot = {
   corsPolicies: EntityMap<CorsPolicy>;
   logPolicies: EntityMap<LogPolicy>;
   upstreamGroups: EntityMap<UpstreamGroup>;
+  hooks: EntityMap<Hook>;
 };
 
 export type LogPolicy = {

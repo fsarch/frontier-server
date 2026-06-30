@@ -1,0 +1,8 @@
+function_worker:
+  type: 'remote'
+  url: 'http://127.0.0.1:8082'
+  auth:
+    type: 'openid-client-credentials'
+    token_endpoint: ''
+    client_id: ''
+    client_secret: ''

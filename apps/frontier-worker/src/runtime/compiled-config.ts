@@ -1,4 +1,18 @@
-import { CorsPolicy, WorkerConfigSnapshot } from '../types/worker-config.types';
+import { CorsPolicy, EntityMap, Hook, PathRule, WorkerConfigSnapshot } from '../types/worker-config.types';
+import { FunctionServerConfig, HookConfig } from './function-client.js';
+
+export type CompiledHookFunction = {
+  name: string;
+  functionServerName: string;
+  path: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  timeoutMs: number;
+};
+
+export type CompiledHooks = {
+  enabled: boolean;
+  functions: CompiledHookFunction[];
+};
 
 type CompiledUpstream = {
   host: string;
@@ -14,6 +28,8 @@ type CompiledRoute = {
   upstreams: CompiledUpstream[];
   cors: CompiledCorsPolicy;
   cursor: number;
+  preHooks: CompiledHooks;
+  postHooks: CompiledHooks;
 };
 
 type CompiledCorsPolicy = {
@@ -47,6 +63,8 @@ export type RouteResolution = {
     logPolicyId: string | null;
     retentionTimeSeconds: number;
   };
+  preHooks: CompiledHooks;
+  postHooks: CompiledHooks;
 };
 
 export type CompiledRouteDescription = {
@@ -65,7 +83,7 @@ export class CompiledWorkerConfig {
   private readonly domainGroups = new Map<string, CompiledDomainGroup>();
   private readonly debugEnabled = isDebugEnabled(process.env.FRONTIER_WORKER_DEBUG);
 
-  constructor(private readonly snapshot: WorkerConfigSnapshot) {
+  constructor(private readonly snapshot: WorkerConfigSnapshot, private readonly functionConfigs: Record<string, FunctionServerConfig> = {}) {
     this.compile();
   }
 
@@ -123,6 +141,8 @@ export class CompiledWorkerConfig {
           logPolicyId: route.log.logPolicyId,
           retentionTimeSeconds: route.log.retentionTimeSeconds,
         },
+        preHooks: route.preHooks,
+        postHooks: route.postHooks,
       };
     }
 
@@ -211,6 +231,8 @@ export class CompiledWorkerConfig {
           log: compileLogPolicy(rule.logPolicyId ? this.snapshot.logPolicies.entities[rule.logPolicyId] : undefined),
           upstreams,
           cors: compileCorsPolicy(rule.corsPolicyId ? this.snapshot.corsPolicies.entities[rule.corsPolicyId] : undefined),
+          preHooks: compileHooks(rule.preHookId, this.snapshot.hooks),
+          postHooks: compileHooks(rule.postHookId, this.snapshot.hooks),
           cursor: 0,
         });
       }
@@ -381,6 +403,53 @@ function compileLogPolicy(policy: WorkerConfigSnapshot['logPolicies']['entities'
     enabled: policy?.enabled === true,
     logPolicyId: policy?.id ?? null,
     retentionTimeSeconds: policy?.retentionTimeSeconds ?? 0,
+  };
+}
+
+function compileHook(hook: Hook | undefined): CompiledHookFunction | null {
+  if (!hook) {
+    return null;
+  }
+  
+  // Get the function configuration for this hook
+  const functionConfig = this.functionConfigs[hook.functionId];
+  if (!functionConfig) {
+    return null;
+  }
+  
+  // Find the hook configuration within the function config
+  const hookConfig = functionConfig.hooks?.find(h => h.name === hook.name);
+  if (!hookConfig) {
+    return null;
+  }
+  
+  return {
+    name: hook.name,
+    functionServerName: hook.functionId, // functionId maps to function_server_name
+    path: hookConfig.path,
+    method: hookConfig.method,
+    timeoutMs: hookConfig.timeout_ms ?? 5000,
+  };
+}
+
+function compileHooks(hookId: string | null | undefined, hooks: EntityMap<Hook>): CompiledHooks {
+  if (!hookId) {
+    return { enabled: false, functions: [] };
+  }
+
+  const hook = hooks.entities[hookId];
+  if (!hook) {
+    return { enabled: false, functions: [] };
+  }
+
+  const compiledHook = compileHook.call(this, hook);
+  if (!compiledHook) {
+    return { enabled: false, functions: [] };
+  }
+
+  return {
+    enabled: true,
+    functions: [compiledHook],
   };
 }
 

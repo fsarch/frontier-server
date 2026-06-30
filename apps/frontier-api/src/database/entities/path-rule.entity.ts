@@ -70,6 +70,20 @@ export class PathRule {
   })
   logPolicyId?: string | null;
 
+  @Column({
+    name: 'pre_hook_id',
+    type: 'uuid',
+    nullable: true,
+  })
+  preHookId?: string | null;
+
+  @Column({
+    name: 'post_hook_id',
+    type: 'uuid',
+    nullable: true,
+  })
+  postHookId?: string | null;
+
   @CreateDateColumn({
     name: 'creation_time',
   })

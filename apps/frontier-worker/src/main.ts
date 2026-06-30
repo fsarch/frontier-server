@@ -1,5 +1,7 @@
 import { ControlPlaneClient } from './control-plane/control-plane.client';
 import { HttpProxyServer, RequestLogPayload } from './runtime/http-proxy.server';
+import { FunctionClient } from './runtime/function-client.js';
+import { loadWorkerConfig } from './runtime/config-loader.js';
 import { request as httpRequest } from 'undici';
 
 const workerPort = parseInt(process.env.FRONTIER_WORKER_PORT ?? '8080', 10);
@@ -7,13 +9,23 @@ const controlPlaneUrl = process.env.FRONTIER_CONTROL_PLANE_URL ?? 'ws://localhos
 const workerAuthToken = process.env.FRONTIER_WORKER_AUTH_TOKEN ?? 'Test';
 const heartbeatIntervalMs = parseInt(process.env.FRONTIER_WORKER_HEARTBEAT_MS ?? '10000', 10);
 const workerLogIngestUrl = process.env.FRONTIER_WORKER_LOG_INGEST_URL ?? deriveWorkerLogIngestUrl(controlPlaneUrl);
+const configPath = process.env.FRONTIER_WORKER_CONFIG_PATH;
 
 async function bootstrap() {
   console.log(`[worker] initializing worker auth=${process.env.FRONTIER_WORKER_AUTH_TOKEN ? 'env' : 'default'} logIngestUrl=${workerLogIngestUrl}`);
+  
+  // Load function configurations
+  const functionConfigs = await loadWorkerConfig(configPath);
+  console.log(`[worker] loaded function configs: worker=${functionConfigs.function_worker ? 'configured' : 'not configured'}`);
+  
+  const functionClient = new FunctionClient(functionConfigs);
+  
   const proxyServer = new HttpProxyServer(workerPort, {
     onRequestLog: async (payload) => {
       await postRequestLog(payload);
     },
+    functionClient,
+    functionConfigs,
   });
   await proxyServer.start();
 
