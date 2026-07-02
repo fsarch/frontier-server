@@ -4,7 +4,7 @@ import { WorkerRequestLogCreateDto } from '../../../models/request-log.model.js'
 import { Inject } from '@nestjs/common';
 import { ModuleConfigurationService } from '@fsarch/server/configuration';
 import { Public } from '@fsarch/server/auth';
-import { ConfigWorkersType } from "../../../types/config.type";
+import { ConfigWorkersType } from "../../../types/config.type.js";
 
 @Controller({
   path: 'api/workers/logs',

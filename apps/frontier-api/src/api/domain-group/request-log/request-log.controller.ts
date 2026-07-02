@@ -4,7 +4,7 @@ import { AuthGuard } from '@fsarch/server/auth';
 import { Roles } from '@fsarch/server/uac';
 import { RequestLogService } from './request-log.service.js';
 import { RequestLogDto, RequestLogQueryDto } from '../../../models/request-log.model.js';
-import { Role } from "../../../constants/role.enum";
+import { Role } from "../../../constants/role.enum.js";
 
 @ApiTags('request-logs')
 @Controller({

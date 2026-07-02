@@ -4,7 +4,7 @@ import { AuthGuard } from '@fsarch/server/auth';
 import { Roles } from '@fsarch/server/uac';
 import { LogPolicyService } from './log-policy.service.js';
 import { LogPolicyCreateDto, LogPolicyDto, LogPolicyUpdateDto } from '../../../models/log-policy.model.js';
-import { Role } from "../../../constants/role.enum";
+import { Role } from "../../../constants/role.enum.js";
 
 @ApiTags('log-policies')
 @Controller({

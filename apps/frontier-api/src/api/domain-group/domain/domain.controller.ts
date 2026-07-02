@@ -4,7 +4,7 @@ import { AuthGuard } from "@fsarch/server/auth";
 import { Roles } from "@fsarch/server/uac";
 import { DomainGroupDomainCreateDto, DomainGroupDomainDto } from "../../../models/domain-group-domain.model.js";
 import { DomainService } from "./domain.service.js";
-import { Role } from "../../../constants/role.enum";
+import { Role } from "../../../constants/role.enum.js";
 
 @ApiTags('domain')
 @Controller({

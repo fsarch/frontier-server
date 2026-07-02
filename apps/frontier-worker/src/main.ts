@@ -1,5 +1,5 @@
-import { ControlPlaneClient } from './control-plane/control-plane.client';
-import { HttpProxyServer, RequestLogPayload } from './runtime/http-proxy.server';
+import { ControlPlaneClient } from './control-plane/control-plane.client.js';
+import { HttpProxyServer, RequestLogPayload } from './runtime/http-proxy.server.js';
 import { FunctionClient } from './runtime/function-client.js';
 import { loadWorkerConfig } from './runtime/config-loader.js';
 import { request as httpRequest } from 'undici';

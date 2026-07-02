@@ -1,4 +1,4 @@
-import { CorsPolicy, EntityMap, Hook, PathRule, WorkerConfigSnapshot } from '../types/worker-config.types';
+import { CorsPolicy, EntityMap, Hook, PathRule, WorkerConfigSnapshot } from '../types/worker-config.types.js';
 import { FunctionServerConfig, HookConfig } from './function-client.js';
 
 export type CompiledHookFunction = {

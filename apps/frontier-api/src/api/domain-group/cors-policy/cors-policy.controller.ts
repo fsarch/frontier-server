@@ -4,7 +4,7 @@ import { AuthGuard } from '@fsarch/server/auth';
 import { Roles } from '@fsarch/server/uac';
 import { CorsPolicyService } from './cors-policy.service.js';
 import { CorsPolicyCreateDto, CorsPolicyDto, CorsPolicyUpdateDto } from '../../../models/cors-policy.model.js';
-import { Role } from "../../../constants/role.enum";
+import { Role } from "../../../constants/role.enum.js";
 
 @ApiTags('cors-policies')
 @Controller({

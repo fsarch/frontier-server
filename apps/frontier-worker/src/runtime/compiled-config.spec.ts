@@ -1,5 +1,5 @@
-import { buildUpstreamPath, CompiledWorkerConfig } from './compiled-config';
-import { WorkerConfigSnapshot } from '../types/worker-config.types';
+import { buildUpstreamPath, CompiledWorkerConfig } from './compiled-config.js';
+import { WorkerConfigSnapshot } from '../types/worker-config.types.js';
 
 function createSnapshot(): WorkerConfigSnapshot {
   return {

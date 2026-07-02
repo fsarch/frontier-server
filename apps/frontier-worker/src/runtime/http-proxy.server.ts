@@ -1,8 +1,8 @@
 import { createServer, IncomingHttpHeaders, IncomingMessage, Server, ServerResponse } from 'http';
 import { pipeline } from 'stream/promises';
 import { request as proxyRequest } from 'undici';
-import { buildUpstreamPath, CompiledWorkerConfig, CompiledHooks } from './compiled-config';
-import { WorkerConfigSnapshot } from '../types/worker-config.types';
+import { buildUpstreamPath, CompiledWorkerConfig, CompiledHooks } from './compiled-config.js';
+import { WorkerConfigSnapshot } from '../types/worker-config.types.js';
 import { FunctionClient, FunctionServerConfig } from './function-client.js';
 
 type Metrics = {

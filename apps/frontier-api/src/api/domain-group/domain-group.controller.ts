@@ -4,7 +4,7 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { AuthGuard } from "@fsarch/server/auth";
 import { Roles } from "@fsarch/server/uac";
 import { DomainGroupService } from "./domain-group.service.js";
-import { Role } from "../../constants/role.enum";
+import { Role } from "../../constants/role.enum.js";
 
 @ApiTags('domain-groups')
 @Controller({

@@ -23,7 +23,7 @@ import { CachePolicy } from "../../../database/entities/cache-policy.entity.js";
 import { CorsPolicy } from "../../../database/entities/cors-policy.entity.js";
 import { LogPolicy } from "../../../database/entities/log-policy.entity.js";
 import { ModuleConfigurationService } from '@fsarch/server/configuration';
-import { ConfigWorkersType } from "../../../types/config.type";
+import { ConfigWorkersType } from "../../../types/config.type.js";
 
 type WebSocketResponseMessage<T> = {
   replyTo: string;

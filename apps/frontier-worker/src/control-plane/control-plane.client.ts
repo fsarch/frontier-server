@@ -1,5 +1,5 @@
 import WebSocket from 'ws';
-import { BootstrapReply, WorkerConfigSnapshot } from '../types/worker-config.types';
+import { BootstrapReply, WorkerConfigSnapshot } from '../types/worker-config.types.js';
 
 type PendingMessage = {
   resolve: (value: unknown) => void;

@@ -4,7 +4,7 @@ import { AuthGuard } from '@fsarch/server/auth';
 import { Roles } from '@fsarch/server/uac';
 import { UpstreamGroupService } from "./upstream-group.service.js";
 import { UpstreamGroupCreateDto, UpstreamGroupDto } from "../../../models/upstream-group.model.js";
-import { Role } from "../../../constants/role.enum";
+import { Role } from "../../../constants/role.enum.js";
 
 @ApiTags('upstream-groups')
 @Controller({

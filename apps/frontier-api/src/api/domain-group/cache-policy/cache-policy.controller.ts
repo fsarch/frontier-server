@@ -4,7 +4,7 @@ import { AuthGuard } from '@fsarch/server/auth';
 import { Roles } from '@fsarch/server/uac';
 import { CachePolicyService } from "./cache-policy.service.js";
 import { CachePolicyCreateDto, CachePolicyDto, CachePolicyUpdateDto } from "../../../models/cache-policy.model.js";
-import { Role } from "../../../constants/role.enum";
+import { Role } from "../../../constants/role.enum.js";
 
 @ApiTags('cache-policies')
 @Controller({

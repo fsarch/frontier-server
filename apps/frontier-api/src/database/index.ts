@@ -13,7 +13,7 @@ import { AddCorsPolicyTable1777326431513 } from "./migrations/1777326431513-add-
 import {
   AddLogPolicyAndRequestLog1777413549156
 } from "./migrations/1777413549156-add-log-policy-and-request-log.js";
-import { AddHookTableAndPathRuleHookIds1782845914875 } from "./migrations/1782845914875-add-hook-table-and-path-rule-hook-ids";
+import { AddHookTableAndPathRuleHookIds1782845914875 } from "./migrations/1782845914875-add-hook-table-and-path-rule-hook-ids.js";
 
 export const DATABASE_OPTIONS = {
   entities: [

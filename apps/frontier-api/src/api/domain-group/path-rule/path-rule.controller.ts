@@ -4,7 +4,7 @@ import { AuthGuard } from '@fsarch/server/auth';
 import { Roles } from '@fsarch/server/uac';
 import { PathRuleService } from "./path-rule.service.js";
 import { PathRuleCreateDto, PathRuleDto, PathRuleUpdateDto } from "../../../models/path-rule.model.js";
-import { Role } from "../../../constants/role.enum";
+import { Role } from "../../../constants/role.enum.js";
 
 @ApiTags('path-rules')
 @Controller({
