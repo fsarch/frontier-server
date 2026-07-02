@@ -21,7 +21,11 @@ export class AddHookTableAndPathRuleHookIds1782845914875 implements MigrationInt
           length: '256',
           isNullable: false,
         },
-
+        {
+          name: 'function_id',
+          type: 'uuid',
+          isNullable: false,
+        },
         {
           name: 'creation_time',
           type: 'timestamp with time zone',
