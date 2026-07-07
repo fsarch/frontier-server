@@ -2,11 +2,9 @@ import { CorsPolicy, EntityMap, Hook, PathRule, WorkerConfigSnapshot } from '../
 import { FunctionConfigs, FunctionServerConfig, HookConfig } from './function-client.js';
 
 export type CompiledHookFunction = {
+  id: string;
   name: string;
-  functionServerName: string;
-  path: string;
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  timeoutMs: number;
+  functionId: string;
 };
 
 export type CompiledHooks = {
@@ -417,24 +415,16 @@ function compileHooks(hookId: string | null | undefined, hooks: EntityMap<Hook>,
   }
 
   // Find the function server config for this hook
-  const functionServerConfig = functionServerConfigs[hook.functionId];
+  const functionServerConfig = functionServerConfigs.function_worker;
   if (!functionServerConfig) {
-    return { enabled: false, functions: [] };
-  }
-
-  // Find the hook config details from the function server config
-  const hookConfig = functionServerConfig.hooks?.find(h => h.name === hook.name);
-  if (!hookConfig) {
     return { enabled: false, functions: [] };
   }
 
   // Create compiled hook function with all details
   const compiledHook: CompiledHookFunction = {
+    id: hook.id,
     name: hook.name,
-    functionServerName: hook.functionId,
-    path: hookConfig.path,
-    method: hookConfig.method,
-    timeoutMs: hookConfig.timeout_ms,
+    functionId: hook.functionId,
   };
 
   return {
