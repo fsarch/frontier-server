@@ -12,6 +12,7 @@ import { PathRuleModule } from "../../domain-group/path-rule/path-rule.module.js
 import { ModuleConfiguration } from "@fsarch/server/configuration";
 import { WORKERS_CONFIG_VALIDATOR } from './workers-config.validator.js';
 import { WorkerLogController } from './worker-log.controller.js';
+import { HookModule } from "../../hooks/hook.module.js";
 
 @Module({
   providers: [WebsocketGateway],
@@ -26,6 +27,7 @@ import { WorkerLogController } from './worker-log.controller.js';
     UpstreamGroupModule,
     UpstreamModule,
     PathRuleModule,
+    HookModule,
     ModuleConfiguration.register('WORKERS_CONFIG', {
       name: 'workers',
       validationSchema: WORKERS_CONFIG_VALIDATOR,

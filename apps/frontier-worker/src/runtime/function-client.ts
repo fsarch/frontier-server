@@ -69,6 +69,41 @@ export class FunctionClient {
     const hookUrl = `${functionConfig.url}${hook.path}`;
 
     // Request-Optionen
+    // Safe stringify für den Body, um Circular References zu vermeiden
+    const buildHookBody = () => {
+      try {
+        return JSON.stringify({
+          // Original Request-Daten
+          originalRequest: {
+            method: requestData.method,
+            url: requestData.url,
+            headers: requestData.headers,
+            body: requestData.body,
+          },
+          // Hook-spezifische Daten
+          hook: {
+            name: hook.name,
+            type: 'pre', // oder 'post' - wird vom Aufrufer gesetzt
+          },
+        });
+      } catch (e) {
+        // Fallback für Circular References
+        return JSON.stringify({
+          originalRequest: {
+            method: requestData.method,
+            url: requestData.url,
+            headers: requestData.headers,
+            body: typeof requestData.body === 'object' ? '[Circular]' : requestData.body,
+          },
+          hook: {
+            name: hook.name,
+            type: 'pre',
+          },
+          _error: 'original body had circular references'
+        });
+      }
+    };
+
     const options = {
       method: hook.method,
       headers: {
@@ -76,20 +111,7 @@ export class FunctionClient {
         authorization: `Bearer ${accessToken}`,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({
-        // Original Request-Daten
-        originalRequest: {
-          method: requestData.method,
-          url: requestData.url,
-          headers: requestData.headers,
-          body: requestData.body,
-        },
-        // Hook-spezifische Daten
-        hook: {
-          name: hook.name,
-          type: 'pre', // oder 'post' - wird vom Aufrufer gesetzt
-        },
-      }),
+      body: buildHookBody(),
     };
 
     this.debug(`executing hook: functionServer=${hook.functionServerName} url=${hookUrl} method=${hook.method}`);
@@ -121,6 +143,10 @@ export class FunctionClient {
         headers: response.headers as Record<string, string>,
         body: responseBody,
       };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[worker][function-client] hook request failed: functionServer=${hook.functionServerName} hook=${hook.name} url=${hookUrl} error=${errorMessage}`);
+      throw error;
     } finally {
       clearTimeout(timeoutId);
     }
@@ -179,14 +205,23 @@ export class FunctionClient {
           };
         }
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         this.debug(`pre-hook execution failed: functionServer=${hook.functionServerName}`, error);
+        console.error(`[worker][function-client] pre-hook execution failed: functionServer=${hook.functionServerName} error=${errorMessage}`);
         // Bei Fehlern im Pre-Hook: Fehlermeldung als Response zurückgeben
         return {
           modifiedRequest: currentRequest,
           shortCircuitResponse: {
             statusCode: 500,
-            headers: { 'content-type': 'application/json' },
-            body: { error: `Pre-hook execution failed: ${error instanceof Error ? error.message : String(error)}` },
+            headers: { 
+              'content-type': 'application/json',
+              'x-error': 'pre-hook failed'
+            },
+            body: { 
+              error: `Pre-hook execution failed: ${errorMessage}`,
+              hook: hook.functionServerName,
+              hookName: hook.name
+            },
           },
         };
       }
@@ -241,9 +276,11 @@ export class FunctionClient {
           };
         }
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         this.debug(`post-hook execution failed: functionServer=${hook.functionServerName}`, error);
-        // Bei Fehlern im Post-Hook: Original-Response zurückgeben (kein Short-Circuit)
-        console.error('[worker][hooks] post-hook execution failed:', error);
+        console.error(`[worker][function-client] post-hook execution failed: functionServer=${hook.functionServerName} hook=${hook.name} error=${errorMessage}`);
+        // Bei Fehlern im Post-Hook: Generischer Fehler-Header
+        // Die Original-Response wird zurückgegeben
       }
     }
 

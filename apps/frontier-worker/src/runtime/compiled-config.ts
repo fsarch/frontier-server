@@ -1,5 +1,5 @@
 import { CorsPolicy, EntityMap, Hook, PathRule, WorkerConfigSnapshot } from '../types/worker-config.types.js';
-import { FunctionServerConfig, HookConfig } from './function-client.js';
+import { FunctionConfigs, FunctionServerConfig, HookConfig } from './function-client.js';
 
 export type CompiledHookFunction = {
   name: string;
@@ -83,7 +83,7 @@ export class CompiledWorkerConfig {
   private readonly domainGroups = new Map<string, CompiledDomainGroup>();
   private readonly debugEnabled = isDebugEnabled(process.env.FRONTIER_WORKER_DEBUG);
 
-  constructor(private readonly snapshot: WorkerConfigSnapshot, private readonly functionConfigs: Record<string, FunctionServerConfig> = {}) {
+  constructor(private readonly snapshot: WorkerConfigSnapshot, private readonly functionServerConfigs: FunctionConfigs) {
     this.compile();
   }
 
@@ -231,8 +231,8 @@ export class CompiledWorkerConfig {
           log: compileLogPolicy(rule.logPolicyId ? this.snapshot.logPolicies.entities[rule.logPolicyId] : undefined),
           upstreams,
           cors: compileCorsPolicy(rule.corsPolicyId ? this.snapshot.corsPolicies.entities[rule.corsPolicyId] : undefined),
-          preHooks: compileHooks(rule.preHookId, this.snapshot.hooks),
-          postHooks: compileHooks(rule.postHookId, this.snapshot.hooks),
+          preHooks: compileHooks(rule.preHookId, this.snapshot.hooks ?? ({} as EntityMap<Hook>), this.functionServerConfigs),
+          postHooks: compileHooks(rule.postHookId, this.snapshot.hooks ?? ({} as EntityMap<Hook>), this.functionServerConfigs),
           cursor: 0,
         });
       }
@@ -406,33 +406,7 @@ function compileLogPolicy(policy: WorkerConfigSnapshot['logPolicies']['entities'
   };
 }
 
-function compileHook(hook: Hook | undefined): CompiledHookFunction | null {
-  if (!hook) {
-    return null;
-  }
-  
-  // Get the function configuration for this hook
-  const functionConfig = this.functionConfigs[hook.functionId];
-  if (!functionConfig) {
-    return null;
-  }
-  
-  // Find the hook configuration within the function config
-  const hookConfig = functionConfig.hooks?.find(h => h.name === hook.name);
-  if (!hookConfig) {
-    return null;
-  }
-  
-  return {
-    name: hook.name,
-    functionServerName: hook.functionId, // functionId maps to function_server_name
-    path: hookConfig.path,
-    method: hookConfig.method,
-    timeoutMs: hookConfig.timeout_ms ?? 5000,
-  };
-}
-
-function compileHooks(hookId: string | null | undefined, hooks: EntityMap<Hook>): CompiledHooks {
+function compileHooks(hookId: string | null | undefined, hooks: EntityMap<Hook>, functionServerConfigs: FunctionConfigs): CompiledHooks {
   if (!hookId) {
     return { enabled: false, functions: [] };
   }
@@ -442,10 +416,26 @@ function compileHooks(hookId: string | null | undefined, hooks: EntityMap<Hook>)
     return { enabled: false, functions: [] };
   }
 
-  const compiledHook = compileHook.call(this, hook);
-  if (!compiledHook) {
+  // Find the function server config for this hook
+  const functionServerConfig = functionServerConfigs[hook.functionId];
+  if (!functionServerConfig) {
     return { enabled: false, functions: [] };
   }
+
+  // Find the hook config details from the function server config
+  const hookConfig = functionServerConfig.hooks?.find(h => h.name === hook.name);
+  if (!hookConfig) {
+    return { enabled: false, functions: [] };
+  }
+
+  // Create compiled hook function with all details
+  const compiledHook: CompiledHookFunction = {
+    name: hook.name,
+    functionServerName: hook.functionId,
+    path: hookConfig.path,
+    method: hookConfig.method,
+    timeoutMs: hookConfig.timeout_ms,
+  };
 
   return {
     enabled: true,

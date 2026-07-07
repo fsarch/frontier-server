@@ -1,6 +1,11 @@
 import { createServer, IncomingHttpHeaders, IncomingMessage, Server, ServerResponse } from 'http';
 import { pipeline } from 'stream/promises';
 import { request as proxyRequest } from 'undici';
+import { gzip as zlibGzip, gunzip as zlibGunzip } from 'zlib';
+import { promisify } from 'util';
+
+const gzipAsync = promisify(zlibGzip);
+const gunzipAsync = promisify(zlibGunzip);
 import { buildUpstreamPath, CompiledWorkerConfig, CompiledHooks } from './compiled-config.js';
 import { WorkerConfigSnapshot } from '../types/worker-config.types.js';
 import { FunctionClient, FunctionServerConfig } from './function-client.js';
@@ -60,6 +65,7 @@ const HOP_BY_HOP_HEADERS = new Set([
   'trailer',
   'transfer-encoding',
   'upgrade',
+  'content-length',
 ]);
 
 export class HttpProxyServer {
@@ -254,10 +260,15 @@ export class HttpProxyServer {
           modifiedRequest = preHookResult.modifiedRequest;
           shortCircuitResponse = preHookResult.shortCircuitResponse;
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
           this.debug(`pre-hook execution failed: ${error}`);
-          // If pre-hook execution fails, return error response
-          res.writeHead(500, { 'content-type': 'application/json' }).end(
-            JSON.stringify({ error: `Pre-hook execution failed: ${error instanceof Error ? error.message : String(error)}` })
+          console.error(`[worker][http-proxy] pre-hook execution failed: ${errorMessage}`);
+          // If pre-hook execution fails, return error response with generic error header
+          res.writeHead(500, {
+            'content-type': 'application/json',
+            'x-error': 'pre-hook failed'
+          }).end(
+            JSON.stringify({ error: `Pre-hook execution failed: ${errorMessage}` })
           );
           await this.reportRequestLog(route, {
             incomingMethod: method,
@@ -297,6 +308,7 @@ export class HttpProxyServer {
       }
 
       // Execute upstream request with potentially modified request data
+      console.log(`[worker][upstream] request: method=${modifiedRequest.method} url=${upstreamUrl}`);
       const upstreamRes = await proxyRequest(upstreamUrl, {
         method: modifiedRequest.method,
         headers: modifiedRequest.headers,
@@ -306,13 +318,33 @@ export class HttpProxyServer {
             : JSON.stringify(modifiedRequest.body))
           : undefined,
       });
+      console.log(`[worker][upstream] response: method=${modifiedRequest.method} url=${upstreamUrl} status=${upstreamRes.statusCode}`);
 
-      // Read upstream response body
+      // Read upstream response body as buffer (not text - in case it's compressed)
       let upstreamResponseBody: unknown;
+      const responseBuffer = await upstreamRes.body.arrayBuffer();
+      
+      // If upstream response is gzip-compressed, decompress it first
+      const upstreamContentEncoding = getSingleHeaderValue(upstreamRes.headers['content-encoding']);
+      const isUpstreamGzipped = upstreamContentEncoding && upstreamContentEncoding.includes('gzip');
+      
+      let bodyBuffer = Buffer.from(responseBuffer as any);
+      if (isUpstreamGzipped) {
+        this.debug(`upstream response is gzip-compressed, decompressing`);
+        try {
+          bodyBuffer = await gunzipAsync(bodyBuffer) as any;
+        } catch (e) {
+          this.debug(`failed to decompress upstream response: ${e}`);
+          console.error('[worker][upstream] failed to decompress gzip response:', e);
+        }
+      }
+      
+      // Convert decompressed buffer to string
+      const bodyText = bodyBuffer.toString('utf-8');
       try {
-        upstreamResponseBody = await upstreamRes.body.json();
+        upstreamResponseBody = JSON.parse(bodyText);
       } catch {
-        upstreamResponseBody = await upstreamRes.body.text();
+        upstreamResponseBody = bodyText;
       }
 
       // Prepare upstream response for hook processing
@@ -333,28 +365,93 @@ export class HttpProxyServer {
             upstreamResponseData
           );
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
           this.debug(`post-hook execution failed: ${error}`);
-          console.error('[worker][hooks] post-hook execution failed:', error);
-          // Continue with original upstream response on post-hook failure
+          console.error(`[worker][http-proxy] post-hook execution failed: ${errorMessage}`);
+          // Add generic error header to response but continue with original upstream response
+          if (!finalResponse.headers) {
+            finalResponse.headers = {};
+          }
+          finalResponse.headers['x-error'] = 'post-hook failed';
         }
       }
 
       const responseHeaders = buildResponseHeaders(upstreamRes.headers as IncomingHttpHeaders);
+       
+      // Since we've decoded the upstream response, remove content-encoding header
+      // (we'll recalculate it based on our response)
+      delete responseHeaders['content-encoding'];
+      delete responseHeaders['content-length'];
+      delete responseHeaders['transfer-encoding'];
+       
       if (route.cors.enabled && requestOrigin) {
         Object.assign(responseHeaders, buildCorsHeaders(route.cors, requestOrigin));
       }
 
-      // Apply modified headers from post-hooks if present
+      // Apply modified headers from post-hooks if present (validate first)
       if (finalResponse.headers) {
-        Object.assign(responseHeaders, finalResponse.headers);
+        for (const [name, value] of Object.entries(finalResponse.headers)) {
+          if (typeof name === 'string' && /^[a-zA-Z0-9\-]+$/.test(name) && typeof value === 'string') {
+            responseHeaders[name] = value;
+          }
+        }
       }
 
       this.debug(`upstream response status=${finalResponse.statusCode} upstream=${upstreamUrl}`);
-      res.writeHead(finalResponse.statusCode, responseHeaders);
+
+      // Check if client accepts gzip encoding
+      const acceptEncoding = getSingleHeaderValue(req.headers['accept-encoding']);
+      const supportsGzip = acceptsEncoding(acceptEncoding, 'gzip');
+      this.debug(`client accepts gzip: ${supportsGzip} (accept-encoding: ${acceptEncoding})`);
 
       if (finalResponse.body) {
-        res.end(JSON.stringify(finalResponse.body));
+        let bodyToSend: string;
+        if (typeof finalResponse.body === 'string') {
+          bodyToSend = finalResponse.body;
+        } else {
+          try {
+            bodyToSend = JSON.stringify(finalResponse.body);
+          } catch (e) {
+            // Fallback für nicht-serializable Objects (z.B. Circular References)
+            bodyToSend = String(finalResponse.body);
+          }
+        }
+
+        // Compress response if client supports gzip and body is large enough
+        if (supportsGzip && Buffer.byteLength(bodyToSend, 'utf8') > 100) {
+          this.debug(`compressing response, body size: ${Buffer.byteLength(bodyToSend, 'utf8')}`);
+          try {
+            const compressed = await gzipAsync(bodyToSend);
+            responseHeaders['content-encoding'] = 'gzip';
+            // Append to vary header instead of overwriting (avoid duplicates)
+            if (responseHeaders['vary']) {
+              if (!responseHeaders['vary'].includes('Accept-Encoding')) {
+                responseHeaders['vary'] += ', Accept-Encoding';
+              }
+            } else {
+              responseHeaders['vary'] = 'Accept-Encoding';
+            }
+            // Set content-length to the compressed body length
+            responseHeaders['content-length'] = compressed.length.toString();
+            // Remove transfer-encoding as we're setting content-length
+            delete responseHeaders['transfer-encoding'];
+            this.debug(`compressed response from ${bodyToSend.length} to ${compressed.length} bytes`);
+            res.writeHead(finalResponse.statusCode, responseHeaders);
+            res.end(compressed);
+          } catch (e) {
+            // Fallback: send uncompressed if compression fails
+            console.error('[worker][upstream] compression failed:', e);
+            this.debug('sending uncompressed response as fallback');
+            res.writeHead(finalResponse.statusCode, responseHeaders);
+            res.end(bodyToSend);
+          }
+        } else {
+          this.debug(`not compressing response, supportsGzip=${supportsGzip} bodySize=${bodyToSend.length}`);
+          res.writeHead(finalResponse.statusCode, responseHeaders);
+          res.end(bodyToSend);
+        }
       } else {
+        res.writeHead(finalResponse.statusCode, responseHeaders);
         res.end();
       }
 
@@ -371,6 +468,7 @@ export class HttpProxyServer {
     } catch (error) {
       this.metrics.totalErrors += 1;
       this.debug('upstream request failed', error);
+      console.log('error', error);
 
       if (!res.headersSent) {
         res.writeHead(502).end('upstream request failed');
@@ -490,7 +588,17 @@ function buildRequestHeaders(headers: IncomingHttpHeaders): Record<string, strin
       continue;
     }
 
-    result[name] = Array.isArray(value) ? value.join(',') : value;
+    // Validate header name
+    if (!/^[a-zA-Z0-9\-]+$/.test(name)) {
+      continue;
+    }
+
+    // Validate header value
+    const headerValue = Array.isArray(value) ? value.join(',') : String(value);
+    if (typeof headerValue !== 'string' || headerValue.length === 0) {
+      continue;
+    }
+    result[name] = headerValue;
   }
 
   return result;
@@ -504,7 +612,17 @@ function buildResponseHeaders(headers: IncomingHttpHeaders): Record<string, stri
       continue;
     }
 
-    result[name] = Array.isArray(value) ? value.join(',') : value;
+    // Validate header name - skip invalid ones to prevent "incorrect header check" errors
+    if (!/^[a-zA-Z0-9\-]+$/.test(name)) {
+      continue;
+    }
+
+    // Validate header value - skip invalid ones
+    const headerValue = Array.isArray(value) ? value.join(',') : String(value);
+    if (typeof headerValue !== 'string' || headerValue.length === 0) {
+      continue;
+    }
+    result[name] = headerValue;
   }
 
   return result;
@@ -516,6 +634,36 @@ function getSingleHeaderValue(value: string | string[] | undefined): string | un
   }
 
   return Array.isArray(value) ? value[0] : value;
+}
+
+function acceptsEncoding(headerValue: string | undefined, encoding: string): boolean {
+  if (!headerValue) {
+    return false;
+  }
+
+  const normalizedEncoding = encoding.toLowerCase();
+  for (const item of headerValue.split(',').map(value => value.trim().toLowerCase())) {
+    if (!item) {
+      continue;
+    }
+
+    const [name, ...params] = item.split(';').map(value => value.trim());
+    if (name !== normalizedEncoding && name !== '*') {
+      continue;
+    }
+
+    const qParam = params.find(param => param.startsWith('q='));
+    if (!qParam) {
+      return true;
+    }
+
+    const qValue = Number.parseFloat(qParam.slice(2));
+    if (Number.isFinite(qValue) && qValue > 0) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function isCorsPreflightRequest(method: string, headers: IncomingHttpHeaders): boolean {
@@ -547,9 +695,11 @@ export function buildCorsHeaders(
   };
 
   const requestedHeaders = getSingleHeaderValue(requestHeaders);
-  result['access-control-allow-headers'] = requestedHeaders && requestedHeaders.trim().length > 0
-    ? requestedHeaders
+  // Sanitize requested headers: only allow valid header names (alphanumeric, dash, underscore)
+  const sanitizedHeaders = requestedHeaders && requestedHeaders.trim().length > 0
+    ? requestedHeaders.split(',').map(h => h.trim()).filter(h => /^[a-zA-Z0-9\-_]+$/.test(h)).join(',')
     : '*';
+  result['access-control-allow-headers'] = sanitizedHeaders.length > 0 ? sanitizedHeaders : '*';
 
   if (policy.allowCredentials) {
     result['access-control-allow-credentials'] = 'true';
@@ -573,4 +723,3 @@ function buildIncomingUrl(hostHeader: string | undefined, requestUrl: URL): stri
 
   return `http://${hostHeader}${requestUrl.pathname}${requestUrl.search}`;
 }
-

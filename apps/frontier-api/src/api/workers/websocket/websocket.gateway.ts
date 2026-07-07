@@ -3,7 +3,7 @@ import {
   SubscribeMessage,
   WebSocketGateway
 } from '@nestjs/websockets';
-import { Inject, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { WebSocket } from "ws";
 import { createHash } from "crypto";
 import { DomainGroupService } from "../../domain-group/domain-group.service.js";
@@ -24,6 +24,8 @@ import { CorsPolicy } from "../../../database/entities/cors-policy.entity.js";
 import { LogPolicy } from "../../../database/entities/log-policy.entity.js";
 import { ModuleConfigurationService } from '@fsarch/server/configuration';
 import { ConfigWorkersType } from "../../../types/config.type.js";
+import { HookService } from "../../hooks/hook.service.js";
+import { Hook } from "../../../database/entities/hook.entity.js";
 
 type WebSocketResponseMessage<T> = {
   replyTo: string;
@@ -36,6 +38,7 @@ type WorkerConfigSnapshot = {
   cachePolicies: TEntity<CachePolicy>;
   corsPolicies: TEntity<CorsPolicy>;
   logPolicies: TEntity<LogPolicy>;
+  hooks: TEntity<Hook>;
   upstreamGroups: TEntity<UpstreamGroup & { upstreams: Array<Upstream> }>;
 };
 
@@ -70,6 +73,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
   private configVersion = 0;
   private configChecksum = '';
   private configCheckInterval: NodeJS.Timeout;
+  private readonly logger = new Logger(WebsocketGateway.name);
 
   constructor(
     @Inject('WORKERS_CONFIG')
@@ -82,6 +86,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
     private readonly upstreamGroupService: UpstreamGroupService,
     private readonly upstreamService: UpstreamService,
     private readonly pathRuleService: PathRuleService,
+    private readonly hookService: HookService,
   ) {
   }
 
@@ -119,6 +124,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
       upstreamGroups,
       upstreams,
       pathRules,
+      hooks,
     ] = await Promise.all([
       this.domainGroupService.List(),
       this.domainGroupDomainService.List(),
@@ -128,6 +134,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
       this.upstreamGroupService.List(),
       this.upstreamService.List(),
       this.pathRuleService.List(),
+      this.hookService.List(),
     ]);
 
     const upstreamGroupsEntity = toEntityGroup(upstreamGroups as Array<UpstreamGroup & { upstreams: Array<Upstream> }>, (upstreamGroup) => upstreamGroup.id);
@@ -156,6 +163,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
       cachePolicies: toEntityGroup(cachePolicies, (cachePolicy) => cachePolicy.id),
       corsPolicies: toEntityGroup(corsPolicies, (corsPolicy) => corsPolicy.id),
       logPolicies: toEntityGroup(logPolicies, (logPolicy) => logPolicy.id),
+      hooks: toEntityGroup(hooks, (hook) => hook.id),
       upstreamGroups: upstreamGroupsEntity,
     };
   }
@@ -239,22 +247,26 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
     checksum: string;
     snapshot: WorkerConfigSnapshot;
   }>> {
-    const snapshot = await this.buildSnapshot();
-    const checksum = this.getSnapshotChecksum(snapshot);
+    try {
+      const snapshot = await this.buildSnapshot();
+      const checksum = this.getSnapshotChecksum(snapshot);
 
-    if (checksum !== this.configChecksum) {
-      this.configChecksum = checksum;
-      this.configVersion += 1;
+      if (checksum !== this.configChecksum) {
+        this.configChecksum = checksum;
+        this.configVersion += 1;
+      }
+
+      return {
+        payload: {
+          version: this.configVersion,
+          checksum: this.configChecksum,
+          snapshot,
+        },
+        replyTo: payload.id,
+      };
+    } catch (e) {
+      this.logger.error('error while handling bootstrap message', e);
     }
-
-    return {
-      payload: {
-        version: this.configVersion,
-        checksum: this.configChecksum,
-        snapshot,
-      },
-      replyTo: payload.id,
-    };
   }
 
   @SubscribeMessage('heartbeat')

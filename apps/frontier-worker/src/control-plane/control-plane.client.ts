@@ -79,8 +79,8 @@ export class ControlPlaneClient {
         this.logInfo(`received bootstrap snapshot (version=${bootstrapReply.version})`);
         await this.options.onSnapshot(bootstrapReply.version, bootstrapReply.snapshot);
         this.logInfo(`applied bootstrap snapshot (version=${bootstrapReply.version})`);
-      } catch {
-        this.logWarn('bootstrap request failed; closing websocket to trigger reconnect');
+      } catch (error) {
+        this.logError('bootstrap request failed; closing websocket to trigger reconnect', error);
         ws.close();
         return;
       }
