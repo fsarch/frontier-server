@@ -1,14 +1,14 @@
 import { createServer, IncomingHttpHeaders, IncomingMessage, Server, ServerResponse } from 'http';
 import { pipeline } from 'stream/promises';
 import { request as proxyRequest } from 'undici';
-import { gzip as zlibGzip, gunzip as zlibGunzip } from 'zlib';
+import { gunzip as zlibGunzip } from 'zlib';
 import { promisify } from 'util';
 
-const gzipAsync = promisify(zlibGzip);
 const gunzipAsync = promisify(zlibGunzip);
 import { buildUpstreamPath, CompiledWorkerConfig, CompiledHooks } from './compiled-config.js';
 import { WorkerConfigSnapshot } from '../types/worker-config.types.js';
 import { FunctionClient, FunctionServerConfig } from './function-client.js';
+import { compressResponseBody } from './response-compression.js';
 
 type Metrics = {
   startedAt: number;
@@ -417,39 +417,13 @@ export class HttpProxyServer {
           }
         }
 
-        // Compress response if client supports gzip and body is large enough
-        if (supportsGzip && Buffer.byteLength(bodyToSend, 'utf8') > 100) {
-          this.debug(`compressing response, body size: ${Buffer.byteLength(bodyToSend, 'utf8')}`);
-          try {
-            const compressed = await gzipAsync(bodyToSend);
-            responseHeaders['content-encoding'] = 'gzip';
-            // Append to vary header instead of overwriting (avoid duplicates)
-            if (responseHeaders['vary']) {
-              if (!responseHeaders['vary'].includes('Accept-Encoding')) {
-                responseHeaders['vary'] += ', Accept-Encoding';
-              }
-            } else {
-              responseHeaders['vary'] = 'Accept-Encoding';
-            }
-            // Set content-length to the compressed body length
-            responseHeaders['content-length'] = compressed.length.toString();
-            // Remove transfer-encoding as we're setting content-length
-            delete responseHeaders['transfer-encoding'];
-            this.debug(`compressed response from ${bodyToSend.length} to ${compressed.length} bytes`);
-            res.writeHead(finalResponse.statusCode, responseHeaders);
-            res.end(compressed);
-          } catch (e) {
-            // Fallback: send uncompressed if compression fails
-            console.error('[worker][upstream] compression failed:', e);
-            this.debug('sending uncompressed response as fallback');
-            res.writeHead(finalResponse.statusCode, responseHeaders);
-            res.end(bodyToSend);
-          }
-        } else {
-          this.debug(`not compressing response, supportsGzip=${supportsGzip} bodySize=${bodyToSend.length}`);
-          res.writeHead(finalResponse.statusCode, responseHeaders);
-          res.end(bodyToSend);
-        }
+        const compressionResult = await compressResponseBody(bodyToSend, responseHeaders, {
+          supportsGzip,
+          onDebug: (msg) => this.debug(msg),
+        });
+
+        res.writeHead(finalResponse.statusCode, compressionResult.headers);
+        res.end(compressionResult.body);
       } else {
         res.writeHead(finalResponse.statusCode, responseHeaders);
         res.end();
