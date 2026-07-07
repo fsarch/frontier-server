@@ -9,6 +9,12 @@ import { buildUpstreamPath, CompiledWorkerConfig, CompiledHooks } from './compil
 import { WorkerConfigSnapshot } from '../types/worker-config.types.js';
 import { FunctionClient, FunctionServerConfig } from './function-client.js';
 import { compressResponseBody } from './response-compression.js';
+import {
+  executePreHooks,
+  executePostHooks,
+  HookRequestData,
+  HookResponse,
+} from './function-hooks.js';
 
 type Metrics = {
   startedAt: number;
@@ -41,19 +47,6 @@ type HttpProxyServerOptions = {
   onRequestLog?: (payload: RequestLogPayload) => Promise<void>;
   functionClient?: FunctionClient;
   functionConfigs?: Record<string, FunctionServerConfig>;
-};
-
-type HookRequestData = {
-  method: string;
-  url: string;
-  headers: Record<string, string>;
-  body?: unknown;
-};
-
-type HookResponse = {
-  statusCode: number;
-  headers: Record<string, string>;
-  body: unknown;
 };
 
 const HOP_BY_HOP_HEADERS = new Set([
@@ -247,42 +240,36 @@ export class HttpProxyServer {
       };
 
       // Execute pre-hooks if available
-      let modifiedRequest = hookRequestData;
-      let shortCircuitResponse: { statusCode: number; headers: Record<string, string>; body: unknown } | undefined;
+      const preHookResult = await executePreHooks(
+        this.functionClient,
+        route.preHooks,
+        hookRequestData,
+        route.pathRuleId,
+        (msg) => this.debug(msg),
+      );
 
-      if (this.functionClient && route.preHooks.enabled && route.preHooks.functions.length > 0) {
-        this.debug(`executing pre-hooks for route: ${route.pathRuleId}`);
-        try {
-          const preHookResult = await this.functionClient.executePreHooks(
-            route.preHooks,
-            hookRequestData
-          );
-          modifiedRequest = preHookResult.modifiedRequest;
-          shortCircuitResponse = preHookResult.shortCircuitResponse;
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          this.debug(`pre-hook execution failed: ${error}`);
-          console.error(`[worker][http-proxy] pre-hook execution failed: ${errorMessage}`);
-          // If pre-hook execution fails, return error response with generic error header
-          res.writeHead(500, {
-            'content-type': 'application/json',
-            'x-error': 'pre-hook failed'
-          }).end(
-            JSON.stringify({ error: `Pre-hook execution failed: ${errorMessage}` })
-          );
-          await this.reportRequestLog(route, {
-            incomingMethod: method,
-            incomingUrl,
-            incomingHeaders: req.headers,
-            upstreamMethod: method,
-            upstreamUrl,
-            upstreamHeaders,
-            responseStatusCode: 500,
-            requestTimeMs: Date.now() - requestStartedAt,
-          });
-          return;
-        }
+      // Check if pre-hook execution failed
+      if (preHookResult.error === true) {
+        res.writeHead(preHookResult.statusCode, {
+          'content-type': 'application/json',
+          'x-error': 'pre-hook failed',
+        }).end(JSON.stringify({ error: preHookResult.message }));
+
+        await this.reportRequestLog(route, {
+          incomingMethod: method,
+          incomingUrl,
+          incomingHeaders: req.headers,
+          upstreamMethod: method,
+          upstreamUrl,
+          upstreamHeaders,
+          responseStatusCode: preHookResult.statusCode,
+          requestTimeMs: Date.now() - requestStartedAt,
+        });
+        return;
       }
+
+      let modifiedRequest = preHookResult.modifiedRequest;
+      const shortCircuitResponse = preHookResult.shortCircuitResponse;
 
       // If pre-hook returned a short-circuit response, send it directly
       if (shortCircuitResponse) {
@@ -355,26 +342,14 @@ export class HttpProxyServer {
       };
 
       // Execute post-hooks if available
-      let finalResponse = upstreamResponseData;
-      if (this.functionClient && route.postHooks.enabled && route.postHooks.functions.length > 0) {
-        this.debug(`executing post-hooks for route: ${route.pathRuleId}`);
-        try {
-          finalResponse = await this.functionClient.executePostHooks(
-            route.postHooks,
-            hookRequestData,
-            upstreamResponseData
-          );
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          this.debug(`post-hook execution failed: ${error}`);
-          console.error(`[worker][http-proxy] post-hook execution failed: ${errorMessage}`);
-          // Add generic error header to response but continue with original upstream response
-          if (!finalResponse.headers) {
-            finalResponse.headers = {};
-          }
-          finalResponse.headers['x-error'] = 'post-hook failed';
-        }
-      }
+      const finalResponse = await executePostHooks(
+        this.functionClient,
+        route.postHooks,
+        hookRequestData,
+        upstreamResponseData,
+        route.pathRuleId,
+        (msg) => this.debug(msg),
+      );
 
       const responseHeaders = buildResponseHeaders(upstreamRes.headers as IncomingHttpHeaders);
        
