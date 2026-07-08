@@ -12,6 +12,7 @@ async function requestToPlainObject(request: Request): Promise<RequestType> {
     const body = await BodyUtils.bodyToPlainObject(request.body);
 
     return {
+        type: 'request',
         method: request.method,
         url: UrlUtils.urlToPlainObject(url),
         headers,
@@ -28,7 +29,7 @@ function plainObjectToRequest(requestType: RequestType): Request {
         (requestType.url.port ? `:${requestType.url.port}` : '') +
         requestType.url.path
     );
-    
+
     // Add query parameters
     for (const [key, values] of Object.entries(requestType.url.query)) {
         for (const value of values) {
@@ -45,7 +46,7 @@ function plainObjectToRequest(requestType: RequestType): Request {
         method: requestType.method,
         headers,
     };
-    
+
     // Only set body if method allows it (not GET or HEAD)
     if (body && !['GET', 'HEAD'].includes(requestType.method)) {
         requestInit.body = body;

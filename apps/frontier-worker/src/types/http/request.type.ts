@@ -13,6 +13,7 @@ export interface RequestUrl {
 }
 
 export interface RequestType {
+  type: 'request';
   method: string;
   url: RequestUrl;
   headers: HeadersType;

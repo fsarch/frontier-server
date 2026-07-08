@@ -10,6 +10,7 @@ async function responseToPlainObject(response: Response): Promise<ResponseType> 
     const body = await BodyUtils.bodyToPlainObject(response.body);
 
     return {
+        type: 'response',
         statusCode: response.status,
         statusText: response.statusText,
         headers,
