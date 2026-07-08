@@ -1,10 +1,10 @@
-import type { Request } from "../http/request.type.js";
-import type { Response } from "../http/response.type.js";
+import type { RequestType } from "../http/request.type.js";
+import type { ResponseType } from "../http/response.type.js";
 
 export interface PostHookPayload {
-    upstreamRequest: Request;
-    clientRequest: Request;
-    response: Response;
+    upstreamRequest: RequestType;
+    clientRequest: RequestType;
+    response: ResponseType;
 }
 
 export interface PostHookType {

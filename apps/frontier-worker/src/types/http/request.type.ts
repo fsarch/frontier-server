@@ -12,7 +12,7 @@ export interface RequestUrl {
   query: QueryParams;
 }
 
-export interface Request {
+export interface RequestType {
   method: string;
   url: RequestUrl;
   headers: HeadersType;

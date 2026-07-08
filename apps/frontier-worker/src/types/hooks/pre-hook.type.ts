@@ -1,8 +1,8 @@
-import type { Request } from "../http/request.type.js";
+import type { RequestType } from "../http/request.type.js";
 
 export interface PreHookPayload {
-    upstreamRequest: Request;
-    clientRequest: Request;
+    upstreamRequest: RequestType;
+    clientRequest: RequestType;
 }
 
 export interface PreHookType {
