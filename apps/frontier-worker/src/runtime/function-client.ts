@@ -183,7 +183,7 @@ export class FunctionClient {
 
         // Wenn der Hook eine Response zurückgibt, die direkt an den Client gesendet werden soll
         // (z. B. für Validierungsfehler)
-        if (result.statusCode !== 200 || (typeof result.body === 'object' && result.body !== null && 'shortCircuit' in result.body && (result.body as { shortCircuit?: boolean }).shortCircuit === true)) {
+        if (result.statusCode !== 201 || (typeof result.body === 'object' && result.body !== null && 'shortCircuit' in result.body && (result.body as { shortCircuit?: boolean }).shortCircuit === true)) {
           this.debug(`pre-hook short-circuit: id=${hook.id} status=${result.statusCode}`);
           return {
             modifiedRequest: currentRequest,
