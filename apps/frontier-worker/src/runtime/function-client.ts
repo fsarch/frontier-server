@@ -137,42 +137,28 @@ export class FunctionClient {
           this.buildPreHookPayload(hook, clientRequestData, currentRequest),
         );
 
-        // Wenn der Hook eine Response zurückgibt, die direkt an den Client gesendet werden soll
-        // (z. B. für Validierungsfehler)
-        if (result.statusCode !== 201 || (typeof result.body === 'object' && result.body !== null && 'shortCircuit' in result.body && (result.body as { shortCircuit?: boolean }).shortCircuit === true)) {
-          this.debug(`pre-hook short-circuit: id=${hook.id} status=${result.statusCode}`);
+        if (result.statusCode !== 201) {
+          this.debug(`pre-hook unexpected status: id=${hook.id} status=${result.statusCode}`);
+          return invalidPreHookResult(currentRequest, hook, 'Pre-hook returned an unexpected status code.');
+        }
+
+        const preHookOutcome = extractPreHookOutcome(result.body);
+
+        if (preHookOutcome.kind === 'request') {
+          currentRequest = preHookOutcome.request;
+          continue;
+        }
+
+        if (preHookOutcome.kind === 'response') {
+          this.debug(`pre-hook response short-circuit: id=${hook.id} status=${result.statusCode}`);
           return {
             modifiedRequest: currentRequest,
-            shortCircuitResponse: {
-              statusCode: result.statusCode,
-              headers: normalizeHeaders(result.headers),
-              body: await normalizeBody(result.body),
-              statusText: normalizeStatusText(result.statusCode),
-            },
+            shortCircuitResponse: preHookOutcome.response,
           };
         }
 
-        // Request modifizieren basierend auf dem Hook-Ergebnis
-        if (result.body && typeof result.body === 'object' && 'modifiedRequest' in result.body) {
-          const modifiedRequestObj = result.body as {
-            modifiedRequest: {
-              method?: string;
-              url?: RequestType['url'];
-              headers?: Record<string, string | string[]>;
-              body?: unknown;
-            };
-          };
-          const modified = modifiedRequestObj.modifiedRequest;
-          currentRequest = {
-            method: modified.method || currentRequest.method,
-            url: modified.url || currentRequest.url,
-            headers: {
-              ...currentRequest.headers,
-              ...(modified.headers ? normalizeHeaders(modified.headers) : {}),
-            },
-            body: modified.body !== undefined ? await normalizeBody(modified.body) : currentRequest.body,
-          };
-        }
+        this.debug(`pre-hook invalid result: id=${hook.id}`);
+        return invalidPreHookResult(currentRequest, hook, 'Pre-hook must return either a request or a response.');
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         this.debug(`pre-hook execution failed: id=${hook.id}`, error);
@@ -181,6 +167,7 @@ export class FunctionClient {
         return {
           modifiedRequest: currentRequest,
           shortCircuitResponse: {
+            type: 'response',
             statusCode: 500,
             headers: normalizeHeaders({
               'content-type': 'application/json',
@@ -231,6 +218,7 @@ export class FunctionClient {
           };
           const modified = modifiedResponseObj.modifiedResponse;
           currentResponse = {
+            type: 'response',
             statusCode: modified.statusCode || currentResponse.statusCode,
             statusText: modified.statusText || currentResponse.statusText,
             headers: {
@@ -357,6 +345,63 @@ export class FunctionClient {
   }
 }
 
+function extractPreHookOutcome(
+  body: unknown,
+): { kind: 'request'; request: RequestType } | { kind: 'response'; response: ResponseType } | { kind: 'invalid' } {
+  if (!body || typeof body !== 'object') {
+    return { kind: 'invalid' };
+  }
+
+  const candidate = body as Record<string, unknown>;
+  const requestValue = candidate.request ?? candidate.modifiedRequest;
+  const responseValue = candidate.response ?? candidate.modifiedResponse;
+
+  if (requestValue && responseValue) {
+    return { kind: 'invalid' };
+  }
+
+  if (requestValue) {
+    return isRequestType(requestValue)
+      ? { kind: 'request', request: requestValue }
+      : { kind: 'invalid' };
+  }
+
+  if (responseValue) {
+    return isResponseType(responseValue)
+      ? { kind: 'response', response: responseValue }
+      : { kind: 'invalid' };
+  }
+
+  return { kind: 'invalid' };
+}
+
+async function invalidPreHookResult(
+  currentRequest: RequestType,
+  hook: CompiledHookFunction,
+  message: string,
+): Promise<{
+  modifiedRequest: RequestType;
+  shortCircuitResponse: ResponseType;
+}> {
+  return {
+    modifiedRequest: currentRequest,
+    shortCircuitResponse: {
+      type: 'response',
+      statusCode: 500,
+      statusText: STATUS_CODES[500] ?? 'Internal Server Error',
+      headers: normalizeHeaders({
+        'content-type': 'application/json',
+        'x-error': 'pre-hook failed',
+      }),
+      body: await normalizeBody({
+        error: message,
+        hook: hook.id,
+        hookName: hook.name,
+      }),
+    },
+  };
+}
+
 async function normalizeBody(value: unknown): Promise<ResponseType['body']> {
   if (value && typeof value === 'object' && 'type' in value && 'payload' in value) {
     return value as ResponseType['body'];
@@ -377,6 +422,69 @@ function normalizeHeaders(headers: Record<string, string | string[]>): ResponseT
   }
 
   return result;
+}
+
+function isRequestType(value: unknown): value is RequestType {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as RequestType;
+  return (
+    typeof candidate.method === 'string' &&
+    isRequestUrl(candidate.url) &&
+    isHeadersType(candidate.headers) &&
+    isBodyType(candidate.body)
+  );
+}
+
+function isResponseType(value: unknown): value is ResponseType {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as ResponseType;
+  return (
+    typeof candidate.statusCode === 'number' &&
+    typeof candidate.statusText === 'string' &&
+    isHeadersType(candidate.headers) &&
+    isBodyType(candidate.body)
+  );
+}
+
+function isRequestUrl(value: unknown): value is RequestType['url'] {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as RequestType['url'];
+  return (
+    typeof candidate.scheme === 'string' &&
+    typeof candidate.host === 'string' &&
+    typeof candidate.path === 'string' &&
+    typeof candidate.port === 'number' &&
+    isQueryParams(candidate.query)
+  );
+}
+
+function isQueryParams(value: unknown): boolean {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  return Object.values(value as Record<string, unknown>).every((item) => Array.isArray(item) && item.every((entry) => typeof entry === 'string'));
+}
+
+function isHeadersType(value: unknown): value is ResponseType['headers'] {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  return Object.values(value as Record<string, unknown>).every((item) => Array.isArray(item) && item.every((entry) => typeof entry === 'string'));
+}
+
+function isBodyType(value: unknown): value is ResponseType['body'] {
+  return Boolean(value && typeof value === 'object' && 'type' in value && (value as { type?: unknown }).type === 'json' && 'payload' in value);
 }
 
 function normalizeStatusText(statusCode: number): string {

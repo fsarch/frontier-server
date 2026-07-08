@@ -334,6 +334,7 @@ export class HttpProxyServer {
 
       // Prepare upstream response for hook processing
       const upstreamResponseData: ResponseType = {
+        type: 'response',
         statusCode: upstreamRes.statusCode,
         statusText: upstreamRes.statusText,
         headers: buildResponseHeadersType(upstreamRes.headers as IncomingHttpHeaders),
@@ -596,6 +597,7 @@ async function buildRequestType(
   }
 
   return {
+    type: 'request',
     method,
     url: {
       scheme: url.protocol.replace(':', ''),
