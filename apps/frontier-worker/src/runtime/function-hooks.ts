@@ -1,22 +1,11 @@
 import { FunctionClient } from './function-client.js';
 import { CompiledHooks } from './compiled-config.js';
-
-export type HookRequestData = {
-  method: string;
-  url: string;
-  headers: Record<string, string>;
-  body?: unknown;
-};
-
-export type HookResponse = {
-  statusCode: number;
-  headers: Record<string, string>;
-  body: unknown;
-};
+import type { RequestType } from '../types/http/request.type.js';
+import type { ResponseType } from '../types/http/response.type.js';
 
 export type PreHookExecutionResult = {
-  modifiedRequest: HookRequestData;
-  shortCircuitResponse?: HookResponse;
+  modifiedRequest: RequestType;
+  shortCircuitResponse?: ResponseType;
   error?: false;
 };
 
@@ -26,7 +15,7 @@ export type PreHookErrorResult = {
   message: string;
 };
 
-export type PostHookExecutionResult = HookResponse;
+export type PostHookExecutionResult = ResponseType;
 
 /**
  * Executes pre-hooks for a request if the function client and hooks are available.
@@ -37,18 +26,23 @@ export type PostHookExecutionResult = HookResponse;
 export async function executePreHooks(
   functionClient: FunctionClient | null,
   preHooks: CompiledHooks,
-  hookRequestData: HookRequestData,
+  clientRequestData: RequestType,
+  upstreamRequestData: RequestType,
   routePathRuleId: string,
   onDebug?: (message: string) => void,
 ): Promise<PreHookExecutionResult | PreHookErrorResult> {
   if (!functionClient || !preHooks.enabled || preHooks.functions.length === 0) {
-    return { modifiedRequest: hookRequestData, error: false };
+    return { modifiedRequest: upstreamRequestData, error: false };
   }
 
   onDebug?.(`executing pre-hooks for route: ${routePathRuleId}`);
 
   try {
-    const preHookResult = await functionClient.executePreHooks(preHooks, hookRequestData);
+    const preHookResult = await functionClient.executePreHooks(
+      preHooks,
+      clientRequestData,
+      upstreamRequestData,
+    );
     return {
       modifiedRequest: preHookResult.modifiedRequest,
       shortCircuitResponse: preHookResult.shortCircuitResponse,
@@ -76,8 +70,9 @@ export async function executePreHooks(
 export async function executePostHooks(
   functionClient: FunctionClient | null,
   postHooks: CompiledHooks,
-  hookRequestData: HookRequestData,
-  upstreamResponseData: HookResponse,
+  clientRequestData: RequestType,
+  upstreamRequestData: RequestType,
+  upstreamResponseData: ResponseType,
   routePathRuleId: string,
   onDebug?: (message: string) => void,
 ): Promise<PostHookExecutionResult> {
@@ -90,7 +85,8 @@ export async function executePostHooks(
   try {
     const finalResponse = await functionClient.executePostHooks(
       postHooks,
-      hookRequestData,
+      clientRequestData,
+      upstreamRequestData,
       upstreamResponseData,
     );
     return finalResponse;
@@ -104,7 +100,7 @@ export async function executePostHooks(
     if (!errorResponse.headers) {
       errorResponse.headers = {};
     }
-    errorResponse.headers['x-error'] = 'post-hook failed';
+    errorResponse.headers['x-error'] = ['post-hook failed'];
 
     return errorResponse;
   }

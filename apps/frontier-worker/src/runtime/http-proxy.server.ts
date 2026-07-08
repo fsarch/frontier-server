@@ -7,13 +7,14 @@ import { promisify } from 'util';
 const gunzipAsync = promisify(zlibGunzip);
 import { buildUpstreamPath, CompiledWorkerConfig, CompiledHooks } from './compiled-config.js';
 import { WorkerConfigSnapshot } from '../types/worker-config.types.js';
+import type { RequestType } from '../types/http/request.type.js';
+import type { ResponseType } from '../types/http/response.type.js';
 import { FunctionClient, FunctionServerConfig } from './function-client.js';
+import { BodyUtils } from '../utils/http/body.utils.js';
 import { compressResponseBody } from './response-compression.js';
 import {
   executePreHooks,
   executePostHooks,
-  HookRequestData,
-  HookResponse,
 } from './function-hooks.js';
 
 type Metrics = {
@@ -232,17 +233,14 @@ export class HttpProxyServer {
       const requestBody = method === 'GET' || method === 'HEAD' ? undefined : await this.readRequestBody(req);
 
       // Prepare hook request data
-      const hookRequestData: HookRequestData = {
-        method: method,
-        url: upstreamUrl,
-        headers: upstreamHeaders,
-        body: requestBody,
-      };
+      const clientRequestData = await buildRequestType(method, incomingUrl, req.headers, requestBody, true);
+      const hookRequestData = await buildRequestType(method, upstreamUrl, upstreamHeaders, requestBody, false);
 
       // Execute pre-hooks if available
       const preHookResult = await executePreHooks(
         this.functionClient,
         route.preHooks,
+        clientRequestData,
         hookRequestData,
         route.pathRuleId,
         (msg) => this.debug(msg),
@@ -278,8 +276,11 @@ export class HttpProxyServer {
         if (route.cors.enabled && requestOrigin) {
           Object.assign(responseHeaders, buildCorsHeaders(route.cors, requestOrigin));
         }
+        if (shortCircuitResponse.statusText) {
+          res.statusMessage = shortCircuitResponse.statusText;
+        }
         res.writeHead(shortCircuitResponse.statusCode, responseHeaders);
-        res.end(JSON.stringify(shortCircuitResponse.body));
+        res.end(BodyUtils.plainObjectToBody(shortCircuitResponse.body));
 
         await this.reportRequestLog(route, {
           incomingMethod: method,
@@ -296,14 +297,11 @@ export class HttpProxyServer {
 
       // Execute upstream request with potentially modified request data
       console.log(`[worker][upstream] request: method=${modifiedRequest.method} url=${upstreamUrl}`);
+      const upstreamRequestOptions = requestTypeToProxyRequest(modifiedRequest);
       const upstreamRes = await proxyRequest(upstreamUrl, {
-        method: modifiedRequest.method,
-        headers: modifiedRequest.headers,
-        body: modifiedRequest.body !== undefined
-          ? (typeof modifiedRequest.body === 'string'
-            ? modifiedRequest.body
-            : JSON.stringify(modifiedRequest.body))
-          : undefined,
+        method: upstreamRequestOptions.method,
+        headers: upstreamRequestOptions.headers,
+        body: upstreamRequestOptions.body,
       });
       console.log(`[worker][upstream] response: method=${modifiedRequest.method} url=${upstreamUrl} status=${upstreamRes.statusCode}`);
 
@@ -335,17 +333,19 @@ export class HttpProxyServer {
       }
 
       // Prepare upstream response for hook processing
-      const upstreamResponseData = {
+      const upstreamResponseData: ResponseType = {
         statusCode: upstreamRes.statusCode,
-        headers: upstreamRes.headers as Record<string, string>,
-        body: upstreamResponseBody,
+        statusText: upstreamRes.statusText,
+        headers: buildResponseHeadersType(upstreamRes.headers as IncomingHttpHeaders),
+        body: await BodyUtils.bodyToPlainObject(upstreamResponseBody ?? null),
       };
 
       // Execute post-hooks if available
       const finalResponse = await executePostHooks(
         this.functionClient,
         route.postHooks,
-        hookRequestData,
+        clientRequestData,
+        modifiedRequest,
         upstreamResponseData,
         route.pathRuleId,
         (msg) => this.debug(msg),
@@ -365,9 +365,9 @@ export class HttpProxyServer {
 
       // Apply modified headers from post-hooks if present (validate first)
       if (finalResponse.headers) {
-        for (const [name, value] of Object.entries(finalResponse.headers)) {
-          if (typeof name === 'string' && /^[a-zA-Z0-9\-]+$/.test(name) && typeof value === 'string') {
-            responseHeaders[name] = value;
+        for (const [name, values] of Object.entries(finalResponse.headers)) {
+          if (typeof name === 'string' && /^[a-zA-Z0-9\-]+$/.test(name) && Array.isArray(values) && values.length > 0) {
+            responseHeaders[name] = values.join(',');
           }
         }
       }
@@ -379,17 +379,10 @@ export class HttpProxyServer {
       const supportsGzip = acceptsEncoding(acceptEncoding, 'gzip');
       this.debug(`client accepts gzip: ${supportsGzip} (accept-encoding: ${acceptEncoding})`);
 
-      if (finalResponse.body) {
-        let bodyToSend: string;
-        if (typeof finalResponse.body === 'string') {
-          bodyToSend = finalResponse.body;
-        } else {
-          try {
-            bodyToSend = JSON.stringify(finalResponse.body);
-          } catch (e) {
-            // Fallback für nicht-serializable Objects (z.B. Circular References)
-            bodyToSend = String(finalResponse.body);
-          }
+      const bodyToSend = BodyUtils.plainObjectToBody(finalResponse.body);
+      if (bodyToSend) {
+        if (finalResponse.statusText) {
+          res.statusMessage = finalResponse.statusText;
         }
 
         const compressionResult = await compressResponseBody(bodyToSend, responseHeaders, {
@@ -400,6 +393,9 @@ export class HttpProxyServer {
         res.writeHead(finalResponse.statusCode, compressionResult.headers);
         res.end(compressionResult.body);
       } else {
+        if (finalResponse.statusText) {
+          res.statusMessage = finalResponse.statusText;
+        }
         res.writeHead(finalResponse.statusCode, responseHeaders);
         res.end();
       }
@@ -410,7 +406,7 @@ export class HttpProxyServer {
         incomingHeaders: req.headers,
         upstreamMethod: modifiedRequest.method,
         upstreamUrl,
-        upstreamHeaders: modifiedRequest.headers,
+        upstreamHeaders: requestTypeHeadersToRecord(modifiedRequest.headers),
         responseStatusCode: finalResponse.statusCode,
         requestTimeMs: Date.now() - requestStartedAt,
       });
@@ -548,6 +544,127 @@ function buildRequestHeaders(headers: IncomingHttpHeaders): Record<string, strin
       continue;
     }
     result[name] = headerValue;
+  }
+
+  return result;
+}
+
+async function buildRequestType(
+  method: string,
+  urlString: string,
+  headers: IncomingHttpHeaders | Record<string, string>,
+  body: unknown,
+  includeHost: boolean,
+): Promise<RequestType> {
+  const url = new URL(urlString);
+  const query: RequestType['url']['query'] = {};
+
+  url.searchParams.forEach((value, key) => {
+    if (query[key]) {
+      query[key].push(value);
+      return;
+    }
+
+    query[key] = [value];
+  });
+
+  const headerEntries = Object.entries(headers);
+  const requestHeaders: RequestType['headers'] = {};
+  for (const [name, value] of headerEntries) {
+    const lowerName = name.toLowerCase();
+    if (!value || HOP_BY_HOP_HEADERS.has(lowerName) || !/^[a-zA-Z0-9\-]+$/.test(name)) {
+      continue;
+    }
+
+    if (lowerName === 'host' && !includeHost) {
+      continue;
+    }
+
+    const headerValue = Array.isArray(value) ? value.join(',') : String(value);
+    if (headerValue.length === 0) {
+      continue;
+    }
+
+    requestHeaders[lowerName] = [headerValue];
+  }
+
+  if (includeHost) {
+    const host = getSingleHeaderValue((headers as IncomingHttpHeaders).host);
+    if (host) {
+      requestHeaders.host = [host];
+    }
+  }
+
+  return {
+    method,
+    url: {
+      scheme: url.protocol.replace(':', ''),
+      host: url.hostname,
+      path: url.pathname.endsWith('/') && url.pathname.length > 1 ? url.pathname.slice(0, -1) : (url.pathname || '/'),
+      port: url.port ? Number.parseInt(url.port, 10) : (url.protocol === 'https:' ? 443 : url.protocol === 'http:' ? 80 : 0),
+      query,
+    },
+    headers: requestHeaders,
+    body: await BodyUtils.bodyToPlainObject(body ?? null),
+  };
+}
+
+function requestTypeToProxyRequest(request: RequestType): {
+  method: string;
+  headers: Record<string, string>;
+  body?: string;
+} {
+  const headers: Record<string, string> = {};
+
+  for (const [name, values] of Object.entries(request.headers)) {
+    if (!/^[a-zA-Z0-9\-]+$/.test(name) || values.length === 0) {
+      continue;
+    }
+
+    headers[name] = values.join(',');
+  }
+
+  const body = BodyUtils.plainObjectToBody(request.body);
+
+  return {
+    method: request.method,
+    headers,
+    body: body.length > 0 ? body : undefined,
+  };
+}
+
+function requestTypeHeadersToRecord(headers: RequestType['headers']): Record<string, string> {
+  const result: Record<string, string> = {};
+
+  for (const [name, values] of Object.entries(headers)) {
+    if (!/^[a-zA-Z0-9\-]+$/.test(name) || values.length === 0) {
+      continue;
+    }
+
+    result[name] = values.join(',');
+  }
+
+  return result;
+}
+
+function buildResponseHeadersType(headers: IncomingHttpHeaders): ResponseType['headers'] {
+  const result: ResponseType['headers'] = {};
+
+  for (const [name, value] of Object.entries(headers)) {
+    if (!value || HOP_BY_HOP_HEADERS.has(name.toLowerCase())) {
+      continue;
+    }
+
+    if (!/^[a-zA-Z0-9\-]+$/.test(name)) {
+      continue;
+    }
+
+    const values = Array.isArray(value) ? value.map((item) => String(item)) : [String(value)];
+    if (values.length === 0) {
+      continue;
+    }
+
+    result[name] = values;
   }
 
   return result;

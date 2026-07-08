@@ -1,4 +1,10 @@
+import { STATUS_CODES } from 'http';
 import { request as httpRequest } from 'undici';
+import type { PostHookType } from '../types/hooks/post-hook.type.js';
+import type { PreHookType } from '../types/hooks/pre-hook.type.js';
+import type { RequestType } from '../types/http/request.type.js';
+import type { ResponseType } from '../types/http/response.type.js';
+import { BodyUtils } from '../utils/http/body.utils.js';
 import { CompiledHookFunction, CompiledHooks } from './compiled-config.js';
 
 // Typ für Hook-Konfiguration
@@ -48,12 +54,7 @@ export class FunctionClient {
 
   public async executeHook(
     hook: CompiledHookFunction,
-    requestData: {
-      method: string;
-      url: string;
-      headers: Record<string, string>;
-      body?: unknown;
-    },
+    hookPayload: PreHookType | PostHookType,
   ): Promise<{ statusCode: number; headers: Record<string, string>; body: unknown }> {
     const functionConfig = this.getFunctionConfig();
     if (!functionConfig) {
@@ -66,54 +67,15 @@ export class FunctionClient {
     // Hook-URL zusammenbauen
     const hookUrl = `${functionConfig.url}/v1/functions/${hook.functionId}/executions`;
 
-    // Request-Optionen
-    // Safe stringify für den Body, um Circular References zu vermeiden
-    const buildHookBody = () => {
-      try {
-        return JSON.stringify({
-          arguments: [{
-            // Original Request-Daten
-            originalRequest: {
-              method: requestData.method,
-              url: requestData.url,
-              headers: requestData.headers,
-              body: requestData.body,
-            },
-            // Hook-spezifische Daten
-            hook: {
-              name: hook.name,
-              type: 'pre', // oder 'post' - wird vom Aufrufer gesetzt
-            },
-          }],
-        });
-      } catch (e) {
-        // Fallback für Circular References
-        return JSON.stringify({
-          arguments: [{
-            originalRequest: {
-              method: requestData.method,
-              url: requestData.url,
-              headers: requestData.headers,
-              body: typeof requestData.body === 'object' ? '[Circular]' : requestData.body,
-            },
-            hook: {
-              name: hook.name,
-              type: 'pre',
-            },
-            _error: 'original body had circular references',
-          }],
-        });
-      }
-    };
-
     const options = {
       method: 'POST',
       headers: {
-        ...requestData.headers,
         authorization: `Bearer ${accessToken}`,
         'content-type': 'application/json',
       },
-      body: buildHookBody(),
+      body: JSON.stringify({
+        arguments: [hookPayload],
+      }),
     };
 
     this.debug(`executing hook: id=${hook.id} url=${hookUrl}`);
@@ -156,30 +118,24 @@ export class FunctionClient {
 
   public async executePreHooks(
     hooks: CompiledHooks,
-    requestData: {
-      method: string;
-      url: string;
-      headers: Record<string, string>;
-      body?: unknown;
-    },
+    clientRequestData: RequestType,
+    upstreamRequestData: RequestType,
   ): Promise<{
-    modifiedRequest: {
-      method: string;
-      url: string;
-      headers: Record<string, string>;
-      body?: unknown;
-    };
-    shortCircuitResponse?: { statusCode: number; headers: Record<string, string>; body: unknown };
+    modifiedRequest: RequestType;
+    shortCircuitResponse?: ResponseType;
   }> {
     if (!hooks.enabled || hooks.functions.length === 0) {
-      return { modifiedRequest: requestData };
+      return { modifiedRequest: upstreamRequestData };
     }
 
-    let currentRequest = { ...requestData };
+    let currentRequest = { ...upstreamRequestData };
 
     for (const hook of hooks.functions) {
       try {
-        const result = await this.executeHook(hook, currentRequest);
+        const result = await this.executeHook(
+          hook,
+          this.buildPreHookPayload(hook, clientRequestData, currentRequest),
+        );
 
         // Wenn der Hook eine Response zurückgibt, die direkt an den Client gesendet werden soll
         // (z. B. für Validierungsfehler)
@@ -189,21 +145,32 @@ export class FunctionClient {
             modifiedRequest: currentRequest,
             shortCircuitResponse: {
               statusCode: result.statusCode,
-              headers: result.headers,
-              body: result.body,
+              headers: normalizeHeaders(result.headers),
+              body: await normalizeBody(result.body),
+              statusText: normalizeStatusText(result.statusCode),
             },
           };
         }
 
         // Request modifizieren basierend auf dem Hook-Ergebnis
         if (result.body && typeof result.body === 'object' && 'modifiedRequest' in result.body) {
-          const modifiedRequestObj = result.body as { modifiedRequest: { method?: string; url?: string; headers?: Record<string, string>; body?: unknown } };
+          const modifiedRequestObj = result.body as {
+            modifiedRequest: {
+              method?: string;
+              url?: RequestType['url'];
+              headers?: Record<string, string | string[]>;
+              body?: unknown;
+            };
+          };
           const modified = modifiedRequestObj.modifiedRequest;
           currentRequest = {
             method: modified.method || currentRequest.method,
             url: modified.url || currentRequest.url,
-            headers: { ...currentRequest.headers, ...(modified.headers || {}) },
-            body: modified.body !== undefined ? modified.body : currentRequest.body,
+            headers: {
+              ...currentRequest.headers,
+              ...(modified.headers ? normalizeHeaders(modified.headers) : {}),
+            },
+            body: modified.body !== undefined ? await normalizeBody(modified.body) : currentRequest.body,
           };
         }
       } catch (error) {
@@ -215,15 +182,16 @@ export class FunctionClient {
           modifiedRequest: currentRequest,
           shortCircuitResponse: {
             statusCode: 500,
-            headers: {
+            headers: normalizeHeaders({
               'content-type': 'application/json',
-              'x-error': 'pre-hook failed'
-            },
-            body: {
+              'x-error': 'pre-hook failed',
+            }),
+            body: await normalizeBody({
               error: `Pre-hook execution failed: ${errorMessage}`,
               hook: hook.id,
               hookName: hook.name
-            },
+            }),
+            statusText: normalizeStatusText(500),
           },
         };
       }
@@ -234,18 +202,10 @@ export class FunctionClient {
 
   public async executePostHooks(
     hooks: CompiledHooks,
-    requestData: {
-      method: string;
-      url: string;
-      headers: Record<string, string>;
-      body?: unknown;
-    },
-    upstreamResponse: {
-      statusCode: number;
-      headers: Record<string, string>;
-      body: unknown;
-    },
-  ): Promise<{ statusCode: number; headers: Record<string, string>; body: unknown }> {
+    clientRequestData: RequestType,
+    upstreamRequestData: RequestType,
+    upstreamResponse: ResponseType,
+  ): Promise<ResponseType> {
     if (!hooks.enabled || hooks.functions.length === 0) {
       return upstreamResponse;
     }
@@ -254,27 +214,30 @@ export class FunctionClient {
 
     for (const hook of hooks.functions) {
       try {
-        // Füge Response-Daten zum Hook-Request hinzu
-        const result = await this.executeHook(hook, {
-          ...requestData,
-          body: {
-            ...(typeof requestData.body === 'object' ? requestData.body : {}),
-            upstreamResponse: {
-              statusCode: upstreamResponse.statusCode,
-              headers: upstreamResponse.headers,
-              body: upstreamResponse.body,
-            },
-          },
-        });
+        const result = await this.executeHook(
+          hook,
+          this.buildPostHookPayload(hook, clientRequestData, upstreamRequestData, currentResponse),
+        );
 
         // Response modifizieren basierend auf dem Hook-Ergebnis
         if (result.body && typeof result.body === 'object' && 'modifiedResponse' in result.body) {
-          const modifiedResponseObj = result.body as { modifiedResponse: { statusCode?: number; headers?: Record<string, string>; body?: unknown } };
+          const modifiedResponseObj = result.body as {
+            modifiedResponse: {
+              statusCode?: number;
+              statusText?: string;
+              headers?: Record<string, string | string[]>;
+              body?: unknown;
+            };
+          };
           const modified = modifiedResponseObj.modifiedResponse;
           currentResponse = {
             statusCode: modified.statusCode || currentResponse.statusCode,
-            headers: { ...currentResponse.headers, ...(modified.headers || {}) },
-            body: modified.body !== undefined ? modified.body : currentResponse.body,
+            statusText: modified.statusText || currentResponse.statusText,
+            headers: {
+              ...currentResponse.headers,
+              ...(modified.headers ? normalizeHeaders(modified.headers) : {}),
+            },
+            body: modified.body !== undefined ? await normalizeBody(modified.body) : currentResponse.body,
           };
         }
       } catch (error) {
@@ -352,6 +315,72 @@ export class FunctionClient {
 
     console.debug(`[worker][function-client] ${message}`);
   }
+
+  private buildPreHookPayload(
+    hook: CompiledHookFunction,
+    clientRequestData: RequestType,
+    upstreamRequestData: RequestType,
+  ): PreHookType {
+    return {
+      type: 'fsarch.frontier.pre_hook',
+      payload: {
+        clientRequest: clientRequestData,
+        upstreamRequest: upstreamRequestData,
+      },
+      metadata: {
+        hookId: hook.id,
+        hookName: hook.name,
+        functionId: hook.functionId,
+      },
+    };
+  }
+
+  private buildPostHookPayload(
+    hook: CompiledHookFunction,
+    clientRequestData: RequestType,
+    upstreamRequestData: RequestType,
+    responseData: ResponseType,
+  ): PostHookType {
+    return {
+      type: 'fsarch.frontier.post_hook',
+      payload: {
+        clientRequest: clientRequestData,
+        upstreamRequest: upstreamRequestData,
+        response: responseData,
+      },
+      metadata: {
+        hookId: hook.id,
+        hookName: hook.name,
+        functionId: hook.functionId,
+      },
+    };
+  }
+}
+
+async function normalizeBody(value: unknown): Promise<ResponseType['body']> {
+  if (value && typeof value === 'object' && 'type' in value && 'payload' in value) {
+    return value as ResponseType['body'];
+  }
+
+  return BodyUtils.bodyToPlainObject(value ?? null);
+}
+
+function normalizeHeaders(headers: Record<string, string | string[]>): ResponseType['headers'] {
+  const result: ResponseType['headers'] = {};
+
+  for (const [name, value] of Object.entries(headers)) {
+    if (!/^[a-zA-Z0-9\-]+$/.test(name)) {
+      continue;
+    }
+
+    result[name.toLowerCase()] = Array.isArray(value) ? value.map((item) => String(item)) : [String(value)];
+  }
+
+  return result;
+}
+
+function normalizeStatusText(statusCode: number): string {
+  return STATUS_CODES[statusCode] ?? '';
 }
 
 function isDebugEnabled(value: string | undefined): boolean {
