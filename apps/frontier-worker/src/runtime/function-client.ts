@@ -93,7 +93,7 @@ export class FunctionClient {
       clearTimeout(timeoutId);
 
       // Response parsen
-      let responseBody: unknown;
+      let responseBody: { result?: unknown };
       try {
         responseBody = await response.json();
       } catch(ex) {
