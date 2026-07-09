@@ -1,11 +1,11 @@
 import { STATUS_CODES } from 'http';
-import { request as httpRequest } from 'undici';
 import type { PostHookType } from '../types/hooks/post-hook.type.js';
 import type { PreHookType } from '../types/hooks/pre-hook.type.js';
 import type { RequestType } from '../types/http/request.type.js';
 import type { ResponseType } from '../types/http/response.type.js';
 import { BodyUtils } from '../utils/http/body.utils.js';
 import { CompiledHookFunction, CompiledHooks } from './compiled-config.js';
+import { PostHookExecutionResult, PreHookExecutionResult } from "./function-hooks.js";
 
 // Typ für Hook-Konfiguration
 export type HookConfig = {
@@ -65,7 +65,7 @@ export class FunctionClient {
     const accessToken = await this.getAccessToken(functionConfig);
 
     // Hook-URL zusammenbauen
-    const hookUrl = `${functionConfig.url}/v1/functions/${hook.functionId}/executions`;
+    const hookUrl = `${functionConfig.url}/v1/functions/${hook.functionId}/executions?wait=true`;
 
     const options = {
       method: 'POST',
@@ -85,7 +85,7 @@ export class FunctionClient {
     const timeoutId = setTimeout(() => controller.abort(), 5_000);
 
     try {
-      const response = await httpRequest(hookUrl, {
+      const response = await fetch(hookUrl, {
         ...options,
         signal: controller.signal,
       });
@@ -95,17 +95,18 @@ export class FunctionClient {
       // Response parsen
       let responseBody: unknown;
       try {
-        responseBody = await response.body.json();
-      } catch {
-        responseBody = await response.body.text();
+        responseBody = await response.json();
+      } catch(ex) {
+        this.debug(`failed to parse hook response as JSON: id=${hook.id} status=${response.status}`);
+        throw ex;
       }
 
-      this.debug(`hook executed: id=${hook.id} status=${response.statusCode}`);
+      this.debug(`hook executed: id=${hook.id} status=${response.status}`);
 
       return {
-        statusCode: response.statusCode,
-        headers: response.headers as Record<string, string>,
-        body: responseBody,
+        statusCode: response.status,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: responseBody.result,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -142,7 +143,7 @@ export class FunctionClient {
           return invalidPreHookResult(currentRequest, hook, 'Pre-hook returned an unexpected status code.');
         }
 
-        const preHookOutcome = extractPreHookOutcome(result.body);
+        const preHookOutcome = extractPreHookOutcome(result.body, (msg) => this.debug(msg));
 
         if (preHookOutcome.kind === 'request') {
           currentRequest = preHookOutcome.request;
@@ -264,7 +265,7 @@ export class FunctionClient {
     // Neues Token abrufen
     this.debug(`fetching new token for client=${cacheKey} from ${config.auth.token_endpoint}`);
 
-    const tokenResponse = await httpRequest(config.auth.token_endpoint, {
+    const tokenResponse = await fetch(config.auth.token_endpoint, {
       method: 'POST',
       headers: {
         'content-type': 'application/x-www-form-urlencoded',
@@ -276,11 +277,11 @@ export class FunctionClient {
       }).toString(),
     });
 
-    if (tokenResponse.statusCode !== 200) {
-      throw new Error(`Failed to get access token: ${tokenResponse.statusCode}`);
+    if (tokenResponse.status !== 200) {
+      throw new Error(`Failed to get access token: ${tokenResponse.status}`);
     }
 
-    const tokenData = await tokenResponse.body.json() as { access_token?: string; expires_in?: number };
+    const tokenData = await tokenResponse.json() as { access_token?: string; expires_in?: number };
     const accessToken = tokenData.access_token || '';
     const expiresIn = tokenData.expires_in ?? 3600; // Default: 1 Stunde
     const expiresAt = Date.now() + (expiresIn * 1000);
@@ -347,31 +348,22 @@ export class FunctionClient {
 
 function extractPreHookOutcome(
   body: unknown,
+  onDebug?: (message: string) => void,
 ): { kind: 'request'; request: RequestType } | { kind: 'response'; response: ResponseType } | { kind: 'invalid' } {
   if (!body || typeof body !== 'object') {
+    onDebug?.('pre-hook result is not an object');
     return { kind: 'invalid' };
   }
 
-  const candidate = body as Record<string, unknown>;
-  const requestValue = candidate.request ?? candidate.modifiedRequest;
-  const responseValue = candidate.response ?? candidate.modifiedResponse;
-
-  if (requestValue && responseValue) {
-    return { kind: 'invalid' };
+  if (isRequestType(body, onDebug)) {
+    return { kind: 'request', request: body };
   }
 
-  if (requestValue) {
-    return isRequestType(requestValue)
-      ? { kind: 'request', request: requestValue }
-      : { kind: 'invalid' };
+  if (isResponseType(body, onDebug)) {
+    return { kind: 'response', response: body };
   }
 
-  if (responseValue) {
-    return isResponseType(responseValue)
-      ? { kind: 'response', response: responseValue }
-      : { kind: 'invalid' };
-  }
-
+  onDebug?.('pre-hook result is neither request nor response');
   return { kind: 'invalid' };
 }
 
@@ -424,32 +416,38 @@ function normalizeHeaders(headers: Record<string, string | string[]>): ResponseT
   return result;
 }
 
-function isRequestType(value: unknown): value is RequestType {
+function isRequestType(value: unknown, onDebug?: (message: string) => void): value is RequestType {
   if (!value || typeof value !== 'object') {
+    onDebug?.('isRequestType: value is not an object');
     return false;
   }
 
   const candidate = value as RequestType;
-  return (
-    typeof candidate.method === 'string' &&
-    isRequestUrl(candidate.url) &&
-    isHeadersType(candidate.headers) &&
-    isBodyType(candidate.body)
-  );
+  const methodOk = typeof candidate.method === 'string';
+  const urlOk = isRequestUrl(candidate.url);
+  const headersOk = isHeadersType(candidate.headers);
+  const bodyOk = isBodyType(candidate.body);
+  const ok = methodOk && urlOk && headersOk && bodyOk;
+
+  onDebug?.(`isRequestType: ${ok ? 'match' : 'no match'} method=${methodOk} url=${urlOk} headers=${headersOk} body=${bodyOk}`);
+  return ok;
 }
 
-function isResponseType(value: unknown): value is ResponseType {
+function isResponseType(value: unknown, onDebug?: (message: string) => void): value is ResponseType {
   if (!value || typeof value !== 'object') {
+    onDebug?.('isResponseType: value is not an object');
     return false;
   }
 
   const candidate = value as ResponseType;
-  return (
-    typeof candidate.statusCode === 'number' &&
-    typeof candidate.statusText === 'string' &&
-    isHeadersType(candidate.headers) &&
-    isBodyType(candidate.body)
-  );
+  const statusCodeOk = typeof candidate.statusCode === 'number';
+  const statusTextOk = typeof candidate.statusText === 'string';
+  const headersOk = isHeadersType(candidate.headers);
+  const bodyOk = isBodyType(candidate.body);
+  const ok = statusCodeOk && statusTextOk && headersOk && bodyOk;
+
+  onDebug?.(`isResponseType: ${ok ? 'match' : 'no match'} statusCode=${statusCodeOk} statusText=${statusTextOk} headers=${headersOk} body=${bodyOk}`);
+  return ok;
 }
 
 function isRequestUrl(value: unknown): value is RequestType['url'] {

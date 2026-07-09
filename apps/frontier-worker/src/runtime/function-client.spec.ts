@@ -1,15 +1,6 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { RequestType } from '../types/http/request.type.js';
 import type { ResponseType } from '../types/http/response.type.js';
-
-const { mockRequest } = vi.hoisted(() => ({
-  mockRequest: vi.fn(),
-}));
-
-vi.mock('undici', () => ({
-  request: mockRequest,
-}));
-
 import { FunctionClient } from './function-client.js';
 
 function createClient() {
@@ -63,33 +54,16 @@ function createResponse(): ResponseType {
   };
 }
 
-function mockHttpResponse(statusCode: number, body: unknown) {
-  return {
-    statusCode,
-    headers: {},
-    body: {
-      json: async () => body,
-      text: async () => JSON.stringify(body),
-    },
-  };
-}
-
-afterEach(() => {
-  mockRequest.mockReset();
-});
-
 describe('FunctionClient pre-hook handling', () => {
   it('executes a returned request', async () => {
     const client = createClient();
     const originalRequest = createRequest('/original');
     const modifiedRequest = createRequest('/modified');
 
-    mockRequest.mockImplementation(async (url: string) => {
-      if (url.includes('/token')) {
-        return mockHttpResponse(200, { access_token: 'token', expires_in: 3600 });
-      }
-
-      return mockHttpResponse(201, { request: modifiedRequest });
+    vi.spyOn(client, 'executeHook').mockResolvedValueOnce({
+      statusCode: 201,
+      headers: {},
+      body: modifiedRequest,
     });
 
     const result = await client.executePreHooks(
@@ -107,12 +81,10 @@ describe('FunctionClient pre-hook handling', () => {
     const request = createRequest('/original');
     const response = createResponse();
 
-    mockRequest.mockImplementation(async (url: string) => {
-      if (url.includes('/token')) {
-        return mockHttpResponse(200, { access_token: 'token', expires_in: 3600 });
-      }
-
-      return mockHttpResponse(201, { response });
+    vi.spyOn(client, 'executeHook').mockResolvedValueOnce({
+      statusCode: 201,
+      headers: {},
+      body: response,
     });
 
     const result = await client.executePreHooks(
@@ -129,12 +101,10 @@ describe('FunctionClient pre-hook handling', () => {
     const client = createClient();
     const request = createRequest('/original');
 
-    mockRequest.mockImplementation(async (url: string) => {
-      if (url.includes('/token')) {
-        return mockHttpResponse(200, { access_token: 'token', expires_in: 3600 });
-      }
-
-      return mockHttpResponse(201, { unexpected: true });
+    vi.spyOn(client, 'executeHook').mockResolvedValueOnce({
+      statusCode: 201,
+      headers: {},
+      body: { unexpected: true },
     });
 
     const result = await client.executePreHooks(
