@@ -202,32 +202,23 @@ export class FunctionClient {
 
     for (const hook of hooks.functions) {
       try {
+        this.debug(`executing post-hook: id=${hook.id} hook=${hook.name}`);
+
         const result = await this.executeHook(
           hook,
           this.buildPostHookPayload(hook, clientRequestData, upstreamRequestData, currentResponse),
         );
 
-        // Response modifizieren basierend auf dem Hook-Ergebnis
-        if (result.body && typeof result.body === 'object' && 'modifiedResponse' in result.body) {
-          const modifiedResponseObj = result.body as {
-            modifiedResponse: {
-              statusCode?: number;
-              statusText?: string;
-              headers?: Record<string, string | string[]>;
-              body?: unknown;
-            };
-          };
-          const modified = modifiedResponseObj.modifiedResponse;
-          currentResponse = {
-            type: 'response',
-            statusCode: modified.statusCode || currentResponse.statusCode,
-            statusText: modified.statusText || currentResponse.statusText,
-            headers: {
-              ...currentResponse.headers,
-              ...(modified.headers ? normalizeHeaders(modified.headers) : {}),
-            },
-            body: modified.body !== undefined ? await normalizeBody(modified.body) : currentResponse.body,
-          };
+        if (result.statusCode !== 201) {
+          this.debug(`post-hook unexpected status: id=${hook.id} status=${result.statusCode}`);
+        }
+
+        // Extract response from hook result
+        const postHookOutcome = extractPostHookOutcome(result.body, (msg) => this.debug(msg));
+
+        if (postHookOutcome.kind === 'response') {
+          this.debug(`post-hook response modified: id=${hook.id} status=${postHookOutcome.response.statusCode}`);
+          currentResponse = postHookOutcome.response;
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -243,13 +234,6 @@ export class FunctionClient {
 
   private getFunctionConfig(): FunctionServerConfig | undefined {
     return this.configs.function_worker;
-  }
-
-  private getHookConfig(functionConfig: FunctionServerConfig | undefined, hookName: string): HookConfig | undefined {
-    if (!functionConfig?.hooks) {
-      return undefined;
-    }
-    return functionConfig.hooks.find(hook => hook.name === hookName);
   }
 
   private async getAccessToken(config: FunctionServerConfig): Promise<string> {
@@ -364,6 +348,23 @@ function extractPreHookOutcome(
   }
 
   onDebug?.('pre-hook result is neither request nor response');
+  return { kind: 'invalid' };
+}
+
+function extractPostHookOutcome(
+  body: unknown,
+  onDebug?: (message: string) => void,
+): { kind: 'response'; response: ResponseType } | { kind: 'invalid' } {
+  if (!body || typeof body !== 'object') {
+    onDebug?.('post-hook result is not an object');
+    return { kind: 'invalid' };
+  }
+
+  if (isResponseType(body, onDebug)) {
+    return { kind: 'response', response: body };
+  }
+
+  onDebug?.('post-hook result is not a response');
   return { kind: 'invalid' };
 }
 
