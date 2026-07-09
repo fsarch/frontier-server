@@ -71,6 +71,7 @@ describe('ResponseUtils', () => {
             });
 
             const result = await ResponseUtils.responseToPlainObject(response);
+            expect(result.body.type).toBe('text');
             expect(result.body.payload).toBe('plain text response');
         });
 

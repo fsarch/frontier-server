@@ -483,7 +483,13 @@ function isHeadersType(value: unknown): value is ResponseType['headers'] {
 }
 
 function isBodyType(value: unknown): value is ResponseType['body'] {
-  return Boolean(value && typeof value === 'object' && 'type' in value && (value as { type?: unknown }).type === 'json' && 'payload' in value);
+  return Boolean(
+    value
+    && typeof value === 'object'
+    && 'type' in value
+    && ((value as { type?: unknown }).type === 'json' || (value as { type?: unknown }).type === 'text')
+    && 'payload' in value,
+  );
 }
 
 function normalizeStatusText(statusCode: number): string {

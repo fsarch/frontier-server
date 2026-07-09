@@ -8,4 +8,10 @@ export interface JsonBodyType {
   payload: unknown;
 }
 
-export type BodyType = JsonBodyType;
+export interface TextBodyType {
+  type: 'text';
+
+  payload: string;
+}
+
+export type BodyType = JsonBodyType | TextBodyType;

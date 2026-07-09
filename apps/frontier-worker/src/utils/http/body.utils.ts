@@ -1,4 +1,4 @@
-import type { BodyType, JsonBodyType } from "../../types/http/shared.type.js";
+import type { BodyType } from "../../types/http/shared.type.js";
 
 /**
  * Converts a body (string or unknown) to a BodyType plain object
@@ -50,6 +50,13 @@ async function bodyToPlainObject(body: BodyInit | null | unknown): Promise<BodyT
         payload = body;
     }
 
+    if (typeof payload === 'string') {
+        return {
+            type: 'text',
+            payload,
+        };
+    }
+
     return {
         type: 'json',
         payload,
@@ -60,13 +67,15 @@ async function bodyToPlainObject(body: BodyInit | null | unknown): Promise<BodyT
  * Converts a BodyType plain object to a string body
  */
 function plainObjectToBody(bodyType: BodyType): string {
-    if (bodyType.type === 'json') {
-        if (bodyType.payload === null || bodyType.payload === undefined) {
-            return '';
-        }
-        return JSON.stringify(bodyType.payload);
+    if (bodyType.type === 'text') {
+        return bodyType.payload;
     }
-    return String(bodyType.payload ?? '');
+
+    if (bodyType.payload === null || bodyType.payload === undefined) {
+        return '';
+    }
+
+    return JSON.stringify(bodyType.payload);
 }
 
 export const BodyUtils = {

@@ -70,6 +70,7 @@ describe('RequestUtils', () => {
             
             const result = await RequestUtils.requestToPlainObject(request);
             // Empty string body is preserved as empty string
+            expect(result.body.type).toBe('text');
             expect(result.body.payload).toBe('');
         });
 

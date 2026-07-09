@@ -15,7 +15,7 @@ describe('BodyUtils', () => {
             const body = 'plain text';
             const result = await BodyUtils.bodyToPlainObject(body);
             
-            expect(result.type).toBe('json');
+            expect(result.type).toBe('text');
             expect(result.payload).toBe('plain text');
         });
 
@@ -36,7 +36,7 @@ describe('BodyUtils', () => {
         it('should convert empty string to BodyType', async () => {
             const result = await BodyUtils.bodyToPlainObject('');
             
-            expect(result.type).toBe('json');
+            expect(result.type).toBe('text');
             // Empty string is preserved as empty string, not null
             expect(result.payload).toBe('');
         });
@@ -71,12 +71,12 @@ describe('BodyUtils', () => {
 
         it('should convert BodyType with string payload to string', () => {
             const bodyType = {
-                type: 'json',
+                type: 'text',
                 payload: 'plain text',
             };
             
             const result = BodyUtils.plainObjectToBody(bodyType);
-            expect(result).toBe('"plain text"');
+            expect(result).toBe('plain text');
         });
 
         it('should convert BodyType with null payload to empty string', () => {
@@ -137,6 +137,16 @@ describe('BodyUtils', () => {
             
             const parsed = JSON.parse(result);
             expect(parsed).toEqual(original);
+        });
+
+        it('should convert text body to plain text string', () => {
+            const bodyType = {
+                type: 'text',
+                payload: 'plain text',
+            };
+
+            const result = BodyUtils.plainObjectToBody(bodyType);
+            expect(result).toBe('plain text');
         });
     });
 });
