@@ -1,6 +1,4 @@
 import { createServer, IncomingHttpHeaders, IncomingMessage, Server, ServerResponse } from 'http';
-import { pipeline } from 'stream/promises';
-import { request as proxyRequest } from 'undici';
 import { gunzip as zlibGunzip } from 'zlib';
 import { promisify } from 'util';
 
@@ -16,6 +14,7 @@ import {
   executePreHooks,
   executePostHooks,
 } from './function-hooks.js';
+import { HeadersUtils } from "../utils/http/index.js";
 
 type Metrics = {
   startedAt: number;
@@ -298,21 +297,21 @@ export class HttpProxyServer {
       // Execute upstream request with potentially modified request data
       console.log(`[worker][upstream] request: method=${modifiedRequest.method} url=${upstreamUrl}`);
       const upstreamRequestOptions = requestTypeToProxyRequest(modifiedRequest);
-      const upstreamRes = await proxyRequest(upstreamUrl, {
+      const upstreamRes = await fetch(upstreamUrl, {
         method: upstreamRequestOptions.method,
         headers: upstreamRequestOptions.headers,
         body: upstreamRequestOptions.body,
       });
-      console.log(`[worker][upstream] response: method=${modifiedRequest.method} url=${upstreamUrl} status=${upstreamRes.statusCode}`);
+      console.log(`[worker][upstream] response: method=${modifiedRequest.method} url=${upstreamUrl} status=${upstreamRes.status}`);
 
       // Read upstream response body as buffer (not text - in case it's compressed)
       let upstreamResponseBody: unknown;
-      const responseBuffer = await upstreamRes.body.arrayBuffer();
-      
+      const responseBuffer = await upstreamRes.arrayBuffer();
+
       // If upstream response is gzip-compressed, decompress it first
       const upstreamContentEncoding = getSingleHeaderValue(upstreamRes.headers['content-encoding']);
       const isUpstreamGzipped = upstreamContentEncoding && upstreamContentEncoding.includes('gzip');
-      
+
       let bodyBuffer = Buffer.from(responseBuffer as any);
       if (isUpstreamGzipped) {
         this.debug(`upstream response is gzip-compressed, decompressing`);
@@ -323,7 +322,7 @@ export class HttpProxyServer {
           console.error('[worker][upstream] failed to decompress gzip response:', e);
         }
       }
-      
+
       // Convert decompressed buffer to string
       const bodyText = bodyBuffer.toString('utf-8');
       try {
@@ -335,9 +334,9 @@ export class HttpProxyServer {
       // Prepare upstream response for hook processing
       const upstreamResponseData: ResponseType = {
         type: 'response',
-        statusCode: upstreamRes.statusCode,
+        statusCode: upstreamRes.status,
         statusText: upstreamRes.statusText,
-        headers: buildResponseHeadersType(upstreamRes.headers as IncomingHttpHeaders),
+        headers: HeadersUtils.headersToPlainObject(upstreamRes.headers),
         body: await BodyUtils.bodyToPlainObject(upstreamResponseBody ?? null),
       };
 
@@ -352,23 +351,25 @@ export class HttpProxyServer {
         (msg) => this.debug(msg),
       );
 
-      const responseHeaders = buildResponseHeaders(upstreamRes.headers as IncomingHttpHeaders);
-       
+      const responseHeaders = HeadersUtils.headersToPlainObject(upstreamRes.headers);
+
       // Since we've decoded the upstream response, remove content-encoding header
       // (we'll recalculate it based on our response)
       delete responseHeaders['content-encoding'];
       delete responseHeaders['content-length'];
       delete responseHeaders['transfer-encoding'];
-       
+
       if (route.cors.enabled && requestOrigin) {
         Object.assign(responseHeaders, buildCorsHeaders(route.cors, requestOrigin));
       }
+
+      const responseHeadersSimple: Record<string, string> = {};
 
       // Apply modified headers from post-hooks if present (validate first)
       if (finalResponse.headers) {
         for (const [name, values] of Object.entries(finalResponse.headers)) {
           if (typeof name === 'string' && /^[a-zA-Z0-9\-]+$/.test(name) && Array.isArray(values) && values.length > 0) {
-            responseHeaders[name] = values.join(',');
+            responseHeadersSimple[name] = values.join(',');
           }
         }
       }
@@ -386,7 +387,7 @@ export class HttpProxyServer {
           res.statusMessage = finalResponse.statusText;
         }
 
-        const compressionResult = await compressResponseBody(bodyToSend, responseHeaders, {
+        const compressionResult = await compressResponseBody(bodyToSend, responseHeadersSimple, {
           supportsGzip,
           onDebug: (msg) => this.debug(msg),
         });

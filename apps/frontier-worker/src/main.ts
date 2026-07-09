@@ -2,7 +2,6 @@ import { ControlPlaneClient } from './control-plane/control-plane.client.js';
 import { HttpProxyServer, RequestLogPayload } from './runtime/http-proxy.server.js';
 import { FunctionClient } from './runtime/function-client.js';
 import { loadWorkerConfig } from './runtime/config-loader.js';
-import { request as httpRequest } from 'undici';
 
 const workerPort = parseInt(process.env.FRONTIER_WORKER_PORT ?? '8080', 10);
 const controlPlaneUrl = process.env.FRONTIER_CONTROL_PLANE_URL ?? 'ws://localhost:3000/api/workers/websocket';
@@ -13,13 +12,13 @@ const configPath = process.env.FRONTIER_WORKER_CONFIG_PATH;
 
 async function bootstrap() {
   console.log(`[worker] initializing worker auth=${process.env.FRONTIER_WORKER_AUTH_TOKEN ? 'env' : 'default'} logIngestUrl=${workerLogIngestUrl}`);
-  
+
   // Load function configurations
   const functionConfigs = await loadWorkerConfig(configPath);
   console.log(`[worker] loaded function configs: worker=${functionConfigs.function_worker ? 'configured' : 'not configured'}`);
-  
+
   const functionClient = new FunctionClient(functionConfigs);
-  
+
   const proxyServer = new HttpProxyServer(workerPort, {
     onRequestLog: async (payload) => {
       await postRequestLog(payload);
@@ -64,7 +63,7 @@ bootstrap().catch((error) => {
 });
 
 async function postRequestLog(payload: RequestLogPayload): Promise<void> {
-  const response = await httpRequest(workerLogIngestUrl, {
+  const response = await fetch(workerLogIngestUrl, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -73,14 +72,12 @@ async function postRequestLog(payload: RequestLogPayload): Promise<void> {
     body: JSON.stringify(payload),
   });
 
-  if (response.statusCode >= 300) {
-    const responseText = await response.body.text();
+  if (response.status >= 300) {
+    const responseText = await response.text();
     const errorDetails = responseText ? ` (${responseText})` : '';
-    console.error(`[worker] log ingest failed: status=${response.statusCode}, token=${workerAuthToken ? 'set' : 'empty'}, url=${workerLogIngestUrl}, details=${errorDetails}`);
-    throw new Error(`log ingest failed status=${response.statusCode}${errorDetails} url=${workerLogIngestUrl}`);
+    console.error(`[worker] log ingest failed: status=${response.status}, token=${workerAuthToken ? 'set' : 'empty'}, url=${workerLogIngestUrl}, details=${errorDetails}`);
+    throw new Error(`log ingest failed status=${response.status}${errorDetails} url=${workerLogIngestUrl}`);
   }
-
-  await response.body.text();
 }
 
 function deriveWorkerLogIngestUrl(websocketUrl: string): string {
