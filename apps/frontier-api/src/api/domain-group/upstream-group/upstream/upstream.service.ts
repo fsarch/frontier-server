@@ -83,7 +83,8 @@ export class UpstreamService {
     });
 
     if (upstreamDto.sslOptions !== undefined) {
-      await this.upstreamSslOptionsRepository.update(id, {
+      await this.upstreamSslOptionsRepository.save({
+        id,
         sslVerify: upstreamDto.sslOptions?.sslVerify ?? true,
       });
     }
