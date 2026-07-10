@@ -1,11 +1,12 @@
 import type { HeadersType } from "../../types/http/shared.type.js";
+import { Headers as UndiciHeaders } from "undici";
 
 /**
  * Converts a Headers object to a HeadersType (Record<string, string[]>)
  * Supports multiple header values for the same key
  * In Node.js, Headers.get() returns comma-separated values
  */
-function headersToPlainObject(headers: Headers): HeadersType {
+function headersToPlainObject(headers: Headers | UndiciHeaders): HeadersType {
     const result: HeadersType = {};
     // Use forEach to iterate through all header names
     headers.forEach((_value, key) => {

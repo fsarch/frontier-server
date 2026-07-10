@@ -1,7 +1,7 @@
 import { createServer, IncomingHttpHeaders, IncomingMessage, Server, ServerResponse } from 'http';
 import { gunzip as zlibGunzip } from 'zlib';
 import { promisify } from 'util';
-import { Agent as UndiciAgent } from 'undici';
+import { Agent as UndiciAgent, type RequestInit, type Response, fetch } from 'undici';
 
 const gunzipAsync = promisify(zlibGunzip);
 import { buildUpstreamPath, CompiledWorkerConfig } from './compiled-config.js';
