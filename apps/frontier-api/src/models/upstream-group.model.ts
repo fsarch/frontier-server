@@ -23,3 +23,8 @@ export class UpstreamGroupCreateDto {
   @ApiProperty()
   name: string;
 }
+
+export class UpstreamGroupUpdateDto {
+  @ApiProperty({ required: false })
+  name?: string;
+}
