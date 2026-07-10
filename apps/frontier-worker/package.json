@@ -23,7 +23,7 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^5.2.1",
     "reflect-metadata": "^0.2.2",
     "undici": "^8.7.0",
     "ws": "^8.21.0"
