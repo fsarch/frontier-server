@@ -1,10 +1,10 @@
 import { createServer, IncomingHttpHeaders, IncomingMessage, Server, ServerResponse } from 'http';
-import { request as httpsRequest } from 'https';
+import { Agent as HttpsAgent } from 'https';
 import { gunzip as zlibGunzip } from 'zlib';
 import { promisify } from 'util';
 
 const gunzipAsync = promisify(zlibGunzip);
-import { buildUpstreamPath, CompiledWorkerConfig, CompiledHooks } from './compiled-config.js';
+import { buildUpstreamPath, CompiledWorkerConfig } from './compiled-config.js';
 import { WorkerConfigSnapshot } from '../types/worker-config.types.js';
 import type { RequestType } from '../types/http/request.type.js';
 import type { ResponseType } from '../types/http/response.type.js';
@@ -61,6 +61,10 @@ const HOP_BY_HOP_HEADERS = new Set([
   'upgrade',
   'content-length',
 ]);
+
+const INSECURE_HTTPS_AGENT = new HttpsAgent({
+  rejectUnauthorized: false,
+});
 
 export class HttpProxyServer {
   private readonly metrics: Metrics = {
@@ -672,117 +676,12 @@ async function fetchWithOptionalInsecureTls(
   if (parsedUrl.protocol !== 'https:') {
     return fetch(url, options);
   }
+  const insecureOptions = {
+    ...options,
+    agent: INSECURE_HTTPS_AGENT,
+  } as RequestInit & { agent: HttpsAgent };
 
-  const nodeHeaders = options.headers && !Array.isArray(options.headers)
-    ? Object.fromEntries(Object.entries(options.headers as Record<string, string>).map(([key, value]) => [key, String(value)]))
-    : undefined;
-  const bodyValue = options.body !== undefined ? String(options.body) : undefined;
-
-  const response = await new Promise<{
-    statusCode: number;
-    statusText: string;
-    headers: IncomingHttpHeaders;
-    body: Buffer;
-  }>((resolve, reject) => {
-    const request = httpsRequest(parsedUrl, {
-      method: options.method,
-      headers: nodeHeaders,
-      rejectUnauthorized: false,
-    }, (upstreamResponse) => {
-      const chunks: Buffer[] = [];
-
-      upstreamResponse.on('data', (chunk) => {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-      });
-
-      upstreamResponse.on('end', () => {
-        resolve({
-          statusCode: upstreamResponse.statusCode ?? 502,
-          statusText: upstreamResponse.statusMessage ?? '',
-          headers: upstreamResponse.headers,
-          body: Buffer.concat(chunks),
-        });
-      });
-    });
-
-    request.on('error', reject);
-    if (bodyValue) {
-      request.write(bodyValue);
-    }
-    request.end();
-  });
-
-  return new Response(new Uint8Array(response.body), {
-    status: response.statusCode,
-    statusText: response.statusText,
-    headers: toHeaders(response.headers),
-  });
-}
-
-function toHeaders(headers: IncomingHttpHeaders): Headers {
-  const result = new Headers();
-
-  for (const [name, value] of Object.entries(headers)) {
-    if (!value) {
-      continue;
-    }
-
-    if (Array.isArray(value)) {
-      value.forEach((item) => result.append(name, item));
-      continue;
-    }
-
-    result.set(name, String(value));
-  }
-
-  return result;
-}
-
-function buildResponseHeadersType(headers: IncomingHttpHeaders): ResponseType['headers'] {
-  const result: ResponseType['headers'] = {};
-
-  for (const [name, value] of Object.entries(headers)) {
-    if (!value || HOP_BY_HOP_HEADERS.has(name.toLowerCase())) {
-      continue;
-    }
-
-    if (!/^[a-zA-Z0-9\-]+$/.test(name)) {
-      continue;
-    }
-
-    const values = Array.isArray(value) ? value.map((item) => String(item)) : [String(value)];
-    if (values.length === 0) {
-      continue;
-    }
-
-    result[name] = values;
-  }
-
-  return result;
-}
-
-function buildResponseHeaders(headers: IncomingHttpHeaders): Record<string, string> {
-  const result: Record<string, string> = {};
-
-  for (const [name, value] of Object.entries(headers)) {
-    if (!value || HOP_BY_HOP_HEADERS.has(name.toLowerCase())) {
-      continue;
-    }
-
-    // Validate header name - skip invalid ones to prevent "incorrect header check" errors
-    if (!/^[a-zA-Z0-9\-]+$/.test(name)) {
-      continue;
-    }
-
-    // Validate header value - skip invalid ones
-    const headerValue = Array.isArray(value) ? value.join(',') : String(value);
-    if (typeof headerValue !== 'string' || headerValue.length === 0) {
-      continue;
-    }
-    result[name] = headerValue;
-  }
-
-  return result;
+  return fetch(url, insecureOptions as RequestInit);
 }
 
 function getSingleHeaderValue(value: string | string[] | undefined): string | undefined {
