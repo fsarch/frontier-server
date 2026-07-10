@@ -1,7 +1,7 @@
 import { createServer, IncomingHttpHeaders, IncomingMessage, Server, ServerResponse } from 'http';
-import { Agent as HttpsAgent } from 'https';
 import { gunzip as zlibGunzip } from 'zlib';
 import { promisify } from 'util';
+import { Agent as UndiciAgent } from 'undici';
 
 const gunzipAsync = promisify(zlibGunzip);
 import { buildUpstreamPath, CompiledWorkerConfig } from './compiled-config.js';
@@ -62,8 +62,10 @@ const HOP_BY_HOP_HEADERS = new Set([
   'content-length',
 ]);
 
-const INSECURE_HTTPS_AGENT = new HttpsAgent({
-  rejectUnauthorized: false,
+const INSECURE_TLS_DISPATCHER = new UndiciAgent({
+  connect: {
+    rejectUnauthorized: false,
+  },
 });
 
 export class HttpProxyServer {
@@ -678,8 +680,8 @@ async function fetchWithOptionalInsecureTls(
   }
   const insecureOptions = {
     ...options,
-    agent: INSECURE_HTTPS_AGENT,
-  } as RequestInit & { agent: HttpsAgent };
+    dispatcher: INSECURE_TLS_DISPATCHER,
+  };
 
   return fetch(url, insecureOptions as RequestInit);
 }
