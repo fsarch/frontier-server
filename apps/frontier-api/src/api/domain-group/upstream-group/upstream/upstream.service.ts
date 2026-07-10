@@ -3,7 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Upstream } from "../../../../database/entities/upstream.entity.js";
 import { UpstreamSslOptions } from "../../../../database/entities/upstream-ssl-options.entity.js";
-import { UpstreamCreateDto, UpstreamWithSslOptions } from "../../../../models/upstream.model.js";
+import { UpstreamCreateDto, UpstreamUpdateDto, UpstreamWithSslOptions } from "../../../../models/upstream.model.js";
 
 @Injectable()
 export class UpstreamService {
@@ -53,6 +53,55 @@ export class UpstreamService {
   public async List() {
     const upstreams = await this.upstreamRepository.find();
     return this.attachSslOptions(upstreams);
+  }
+
+  public async GetById(
+    id: string,
+  ) {
+    const upstream = await this.upstreamRepository.findOne({ where: { id } });
+    if (!upstream) {
+      return null;
+    }
+    return (await this.attachSslOptions([upstream]))[0];
+  }
+
+  public async Update(
+    id: string,
+    upstreamDto: UpstreamUpdateDto,
+  ) {
+    const existingUpstream = await this.upstreamRepository.findOne({ where: { id } });
+    if (!existingUpstream) {
+      return null;
+    }
+
+    await this.upstreamRepository.update(id, {
+      name: upstreamDto.name ?? existingUpstream.name,
+      host: upstreamDto.host ?? existingUpstream.host,
+      port: upstreamDto.port ?? existingUpstream.port,
+      path: upstreamDto.path ?? existingUpstream.path,
+      protocol: upstreamDto.protocol ?? existingUpstream.protocol,
+    });
+
+    if (upstreamDto.sslOptions !== undefined) {
+      await this.upstreamSslOptionsRepository.update(id, {
+        sslVerify: upstreamDto.sslOptions?.sslVerify ?? true,
+      });
+    }
+
+    const updatedUpstream = await this.upstreamRepository.findOne({ where: { id } });
+    return (await this.attachSslOptions([updatedUpstream!]))[0];
+  }
+
+  public async Delete(
+    id: string,
+  ) {
+    const existingUpstream = await this.upstreamRepository.findOne({ where: { id } });
+    if (!existingUpstream) {
+      return false;
+    }
+
+    await this.upstreamRepository.softRemove(existingUpstream);
+    return true;
   }
 
   private async attachSslOptions(upstreams: Upstream[]): Promise<UpstreamWithSslOptions[]> {

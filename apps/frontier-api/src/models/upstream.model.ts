@@ -73,3 +73,23 @@ export class UpstreamCreateDto {
   @ApiProperty({ type: UpstreamSslOptionsCreateDto, required: false })
   sslOptions?: UpstreamSslOptionsCreateDto;
 }
+
+export class UpstreamUpdateDto {
+  @ApiProperty({ required: false })
+  name?: string;
+
+  @ApiProperty({ required: false })
+  host?: string;
+
+  @ApiProperty({ required: false })
+  port?: number;
+
+  @ApiProperty({ required: false })
+  path?: string;
+
+  @ApiProperty({ enum: ['http', 'https'], required: false })
+  protocol?: 'http' | 'https';
+
+  @ApiProperty({ type: UpstreamSslOptionsCreateDto, required: false })
+  sslOptions?: UpstreamSslOptionsCreateDto;
+}
