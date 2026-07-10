@@ -1,4 +1,5 @@
 import { createServer, IncomingHttpHeaders, IncomingMessage, Server, ServerResponse } from 'http';
+import { request as httpsRequest } from 'https';
 import { gunzip as zlibGunzip } from 'zlib';
 import { promisify } from 'util';
 
@@ -172,7 +173,7 @@ export class HttpProxyServer {
       }
 
       const upstreamPath = buildUpstreamPath(route.upstream.basePath, route.pathPrefix, requestUrl.pathname);
-      upstreamUrl = `http://${route.upstream.host}:${route.upstream.port}${upstreamPath}${requestUrl.search}`;
+      upstreamUrl = `${route.upstream.protocol}://${route.upstream.host}:${route.upstream.port}${upstreamPath}${requestUrl.search}`;
       upstreamHeaders = buildRequestHeaders(req.headers);
       const requestOrigin = getSingleHeaderValue(req.headers.origin);
       upstreamMethod = method;
@@ -297,11 +298,19 @@ export class HttpProxyServer {
       // Execute upstream request with potentially modified request data
       console.log(`[worker][upstream] request: method=${modifiedRequest.method} url=${upstreamUrl}`);
       const upstreamRequestOptions = requestTypeToProxyRequest(modifiedRequest);
-      const upstreamRes = await fetch(upstreamUrl, {
+      const upstreamFetchOptions: RequestInit = {
         method: upstreamRequestOptions.method,
         headers: upstreamRequestOptions.headers,
         body: upstreamRequestOptions.body,
-      });
+      };
+      if (route.upstream.protocol === 'https' && route.upstream.sslVerify === false) {
+        this.debug(`ssl verification disabled for upstream ${route.upstream.host}:${route.upstream.port}`);
+      }
+      const upstreamRes = await fetchWithOptionalInsecureTls(
+        upstreamUrl,
+        upstreamFetchOptions,
+        route.upstream.protocol === 'https' && route.upstream.sslVerify === false,
+      );
       console.log(`[worker][upstream] response: method=${modifiedRequest.method} url=${upstreamUrl} status=${upstreamRes.status}`);
 
       // Read upstream response body as buffer (not text - in case it's compressed)
@@ -645,6 +654,85 @@ function requestTypeHeadersToRecord(headers: RequestType['headers']): Record<str
     }
 
     result[name] = values.join(',');
+  }
+
+  return result;
+}
+
+async function fetchWithOptionalInsecureTls(
+  url: string,
+  options: RequestInit,
+  insecureTls: boolean,
+): Promise<Response> {
+  if (!insecureTls) {
+    return fetch(url, options);
+  }
+
+  const parsedUrl = new URL(url);
+  if (parsedUrl.protocol !== 'https:') {
+    return fetch(url, options);
+  }
+
+  const nodeHeaders = options.headers && !Array.isArray(options.headers)
+    ? Object.fromEntries(Object.entries(options.headers as Record<string, string>).map(([key, value]) => [key, String(value)]))
+    : undefined;
+  const bodyValue = options.body !== undefined ? String(options.body) : undefined;
+
+  const response = await new Promise<{
+    statusCode: number;
+    statusText: string;
+    headers: IncomingHttpHeaders;
+    body: Buffer;
+  }>((resolve, reject) => {
+    const request = httpsRequest(parsedUrl, {
+      method: options.method,
+      headers: nodeHeaders,
+      rejectUnauthorized: false,
+    }, (upstreamResponse) => {
+      const chunks: Buffer[] = [];
+
+      upstreamResponse.on('data', (chunk) => {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      });
+
+      upstreamResponse.on('end', () => {
+        resolve({
+          statusCode: upstreamResponse.statusCode ?? 502,
+          statusText: upstreamResponse.statusMessage ?? '',
+          headers: upstreamResponse.headers,
+          body: Buffer.concat(chunks),
+        });
+      });
+    });
+
+    request.on('error', reject);
+    if (bodyValue) {
+      request.write(bodyValue);
+    }
+    request.end();
+  });
+
+  return new Response(new Uint8Array(response.body), {
+    status: response.statusCode,
+    statusText: response.statusText,
+    headers: toHeaders(response.headers),
+  });
+}
+
+function toHeaders(headers: IncomingHttpHeaders): Headers {
+  const result = new Headers();
+
+  for (const [name, value] of Object.entries(headers)) {
+    if (!value) {
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item) => result.append(name, item));
+      continue;
+    }
+
+    result.set(name, String(value));
   }
 
   return result;

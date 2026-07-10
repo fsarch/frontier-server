@@ -1,8 +1,22 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { Upstream } from "../database/entities/upstream.entity.js";
 
+export type UpstreamWithSslOptions = Upstream & {
+  sslOptions?: UpstreamSslOptionsDto;
+};
+
+export class UpstreamSslOptionsDto {
+  @ApiProperty({ default: true })
+  sslVerify: boolean;
+}
+
+export class UpstreamSslOptionsCreateDto {
+  @ApiProperty({ required: false, default: true })
+  sslVerify?: boolean;
+}
+
 export class UpstreamDto {
-  static FromDbo(dbo: Upstream) {
+  static FromDbo(dbo: UpstreamWithSslOptions) {
     const dto = new UpstreamDto();
 
     dto.id = dbo.id;
@@ -10,6 +24,10 @@ export class UpstreamDto {
     dto.host = dbo.host;
     dto.port = dbo.port;
     dto.path = dbo.path;
+    dto.protocol = dbo.protocol;
+    dto.sslOptions = {
+      sslVerify: dbo.sslOptions?.sslVerify ?? true,
+    };
 
     return dto;
   }
@@ -28,6 +46,12 @@ export class UpstreamDto {
 
   @ApiProperty()
   path: string;
+
+  @ApiProperty({ enum: ['http', 'https'] })
+  protocol: 'http' | 'https';
+
+  @ApiProperty({ type: UpstreamSslOptionsDto })
+  sslOptions: UpstreamSslOptionsDto;
 }
 
 export class UpstreamCreateDto {
@@ -42,4 +66,10 @@ export class UpstreamCreateDto {
 
   @ApiProperty()
   path: string;
+
+  @ApiProperty({ enum: ['http', 'https'], required: false, default: 'http' })
+  protocol?: 'http' | 'https';
+
+  @ApiProperty({ type: UpstreamSslOptionsCreateDto, required: false })
+  sslOptions?: UpstreamSslOptionsCreateDto;
 }

@@ -51,6 +51,10 @@ export type Upstream = {
   host: string;
   port: number;
   path: string;
+  protocol?: 'http' | 'https';
+  sslOptions?: {
+    sslVerify?: boolean;
+  };
 };
 
 export type UpstreamGroup = {
@@ -83,4 +87,3 @@ export type BootstrapReply = {
   checksum: string;
   snapshot: WorkerConfigSnapshot;
 };
-

@@ -371,6 +371,31 @@ describe('CompiledWorkerConfig', () => {
     expect(route?.domainGroupId).toBe('dg-1');
     expect(route?.pathRuleId).toBe('rule-1');
   });
+
+  it('defaults upstream protocol to http with ssl verification enabled', () => {
+    const config = new CompiledWorkerConfig(createSnapshot());
+    const route = config.resolve('example.com', '/api/users');
+
+    expect(route).not.toBeNull();
+    expect(route?.upstream.protocol).toBe('http');
+    expect(route?.upstream.sslVerify).toBe(true);
+  });
+
+  it('supports https upstream and disabling ssl verification', () => {
+    const snapshot = createSnapshot();
+    const upstream = snapshot.upstreamGroups.entities['ug-1'].upstreams?.[0];
+    if (upstream) {
+      upstream.protocol = 'https';
+      upstream.sslOptions = { sslVerify: false };
+    }
+
+    const config = new CompiledWorkerConfig(snapshot);
+    const route = config.resolve('example.com', '/api/users');
+
+    expect(route).not.toBeNull();
+    expect(route?.upstream.protocol).toBe('https');
+    expect(route?.upstream.sslVerify).toBe(false);
+  });
 });
 
 describe('buildUpstreamPath', () => {
@@ -396,4 +421,3 @@ describe('buildUpstreamPath', () => {
     expect(buildUpstreamPath('/app', '/dashboard/*', '/dashboard/stats')).toBe('/app/stats');
   });
 });
-

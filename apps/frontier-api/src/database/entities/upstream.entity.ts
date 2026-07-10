@@ -50,6 +50,14 @@ export class Upstream {
   })
   path: string;
 
+  @Column({
+    name: 'protocol',
+    length: '16',
+    nullable: false,
+    default: 'http',
+  })
+  protocol: 'http' | 'https';
+
   @CreateDateColumn({
     name: 'creation_time',
   })

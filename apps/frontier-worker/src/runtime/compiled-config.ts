@@ -13,9 +13,11 @@ export type CompiledHooks = {
 };
 
 type CompiledUpstream = {
+  protocol: 'http' | 'https';
   host: string;
   port: number;
   basePath: string;
+  sslVerify: boolean;
 };
 
 type CompiledRoute = {
@@ -213,9 +215,11 @@ export class CompiledWorkerConfig {
         const upstreams = (upstreamGroup?.upstreams ?? [])
           .filter((upstream) => upstream?.host && upstream?.port)
           .map((upstream) => ({
+            protocol: normalizeUpstreamProtocol(upstream.protocol),
             host: upstream.host,
             port: upstream.port,
             basePath: normalizePath(upstream.path),
+            sslVerify: upstream.sslOptions?.sslVerify ?? true,
           }));
 
         if (upstreams.length === 0) {
@@ -279,6 +283,14 @@ function normalizePath(pathname: string): string {
   return normalized.length > 1 && normalized.endsWith('/')
     ? normalized.slice(0, -1)
     : normalized;
+}
+
+function normalizeUpstreamProtocol(protocol: string | undefined): 'http' | 'https' {
+  if (protocol === 'https') {
+    return 'https';
+  }
+
+  return 'http';
 }
 
 export function buildUpstreamPath(basePath: string, pathPrefix: string, requestPath: string): string {
@@ -432,4 +444,3 @@ function compileHooks(hookId: string | null | undefined, hooks: EntityMap<Hook>,
     functions: [compiledHook],
   };
 }
-
