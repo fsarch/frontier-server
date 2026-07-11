@@ -181,7 +181,7 @@ export class HttpProxyServer {
       const upstreamPath = buildUpstreamPath(route.upstream.basePath, route.pathPrefix, requestUrl.pathname);
       upstreamUrl = `${route.upstream.protocol}://${route.upstream.host}:${route.upstream.port}${upstreamPath}${requestUrl.search}`;
       upstreamHeaders = buildRequestHeaders(req.headers);
-      appendForwardedHeaders(upstreamHeaders, req.headers, hostHeader, route.pathPrefix, req.socket.encrypted === true);
+      appendForwardedHeaders(upstreamHeaders, req.headers, hostHeader, route.pathPrefix, 'encrypted' in req.socket && req.socket.encrypted === true);
       const requestOrigin = getSingleHeaderValue(req.headers.origin);
       upstreamMethod = method;
 
