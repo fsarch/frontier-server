@@ -181,6 +181,7 @@ export class HttpProxyServer {
       const upstreamPath = buildUpstreamPath(route.upstream.basePath, route.pathPrefix, requestUrl.pathname);
       upstreamUrl = `${route.upstream.protocol}://${route.upstream.host}:${route.upstream.port}${upstreamPath}${requestUrl.search}`;
       upstreamHeaders = buildRequestHeaders(req.headers);
+      appendForwardedHeaders(upstreamHeaders, req.headers, hostHeader, route.pathPrefix, req.socket.encrypted === true);
       const requestOrigin = getSingleHeaderValue(req.headers.origin);
       upstreamMethod = method;
 
@@ -564,6 +565,116 @@ function buildRequestHeaders(headers: IncomingHttpHeaders): Record<string, strin
   }
 
   return result;
+}
+
+export function appendForwardedHeaders(
+  headers: Record<string, string>,
+  incomingHeaders: IncomingHttpHeaders,
+  hostHeader: string | undefined,
+  pathPrefix: string,
+  isTlsRequest: boolean,
+) {
+  const proto = resolveForwardedProto(incomingHeaders, isTlsRequest);
+  const port = resolveForwardedPort(incomingHeaders, hostHeader, proto);
+  const prefix = normalizeForwardedPrefix(pathPrefix);
+
+  appendForwardedHeader(headers, 'x-forwarded-host', hostHeader);
+  appendForwardedHeader(headers, 'x-forwarded-proto', proto);
+  appendForwardedHeader(headers, 'x-forwarded-port', port);
+  appendForwardedHeader(headers, 'x-forwarded-prefix', prefix);
+}
+
+function resolveForwardedProto(headers: IncomingHttpHeaders, isTlsRequest: boolean): string {
+  const forwardedProto = getFirstCommaSeparatedValue(getSingleHeaderValue(headers['x-forwarded-proto']));
+  if (forwardedProto === 'https' || forwardedProto === 'http') {
+    return forwardedProto;
+  }
+
+  return isTlsRequest ? 'https' : 'http';
+}
+
+function resolveForwardedPort(
+  headers: IncomingHttpHeaders,
+  hostHeader: string | undefined,
+  proto: string,
+): string {
+  const forwardedPort = getFirstCommaSeparatedValue(getSingleHeaderValue(headers['x-forwarded-port']));
+  if (forwardedPort && /^[0-9]+$/.test(forwardedPort)) {
+    return forwardedPort;
+  }
+
+  const hostPort = parsePortFromHostHeader(hostHeader);
+  if (hostPort) {
+    return String(hostPort);
+  }
+
+  return proto === 'https' ? '443' : '80';
+}
+
+function parsePortFromHostHeader(hostHeader: string | undefined): number | undefined {
+  if (!hostHeader) {
+    return undefined;
+  }
+
+  const trimmed = hostHeader.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  // IPv6 host header can be represented as "[::1]:8080".
+  if (trimmed.startsWith('[')) {
+    const closeBracketIndex = trimmed.indexOf(']');
+    if (closeBracketIndex < 0 || closeBracketIndex === trimmed.length - 1 || trimmed[closeBracketIndex + 1] !== ':') {
+      return undefined;
+    }
+
+    const portText = trimmed.slice(closeBracketIndex + 2);
+    return /^[0-9]+$/.test(portText) ? Number.parseInt(portText, 10) : undefined;
+  }
+
+  const colonCount = (trimmed.match(/:/g) ?? []).length;
+  if (colonCount !== 1) {
+    return undefined;
+  }
+
+  const parts = trimmed.split(':');
+  const portText = parts[1];
+  return /^[0-9]+$/.test(portText) ? Number.parseInt(portText, 10) : undefined;
+}
+
+function normalizeForwardedPrefix(pathPrefix: string): string {
+  const trimmed = (pathPrefix ?? '').trim();
+  if (!trimmed || trimmed === '*' || trimmed === '/*') {
+    return '/';
+  }
+
+  if (!trimmed.startsWith('/')) {
+    return '/';
+  }
+
+  if (trimmed.length > 1 && trimmed.endsWith('/')) {
+    return trimmed.slice(0, -1);
+  }
+
+  return trimmed;
+}
+
+function appendForwardedHeader(headers: Record<string, string>, name: string, value: string | undefined) {
+  if (!value) {
+    return;
+  }
+
+  const existing = headers[name];
+  headers[name] = existing && existing.length > 0 ? `${existing}, ${value}` : value;
+}
+
+function getFirstCommaSeparatedValue(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const first = value.split(',')[0]?.trim().toLowerCase();
+  return first?.length ? first : undefined;
 }
 
 async function buildRequestType(

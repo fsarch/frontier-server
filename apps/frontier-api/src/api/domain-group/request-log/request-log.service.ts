@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Between, FindOptionsWhere, LessThan, MoreThan, Repository } from 'typeorm';
+import { Between, FindOptionsSelect, FindOptionsWhere, LessThan, MoreThan, Repository } from 'typeorm';
 import { RequestLog } from '../../../database/entities/request-log.entity.js';
 import { RequestLogQueryDto, WorkerRequestLogCreateDto } from '../../../models/request-log.model.js';
 import { LogPolicy } from '../../../database/entities/log-policy.entity.js';
@@ -89,7 +89,9 @@ export class RequestLogService {
 
   private async getRetentionSeconds(logPolicyId: string): Promise<number> {
     const logPolicy = await this.logPolicyRepository.findOne({
-      select: ['retentionTimeSeconds'],
+      select: {
+        retentionTimeSeconds: true,
+      },
       where: {
         id: logPolicyId,
       },

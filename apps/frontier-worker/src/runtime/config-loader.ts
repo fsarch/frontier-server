@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import { FunctionConfigs } from './function-client.js';
 
 // Get the directory of this file
