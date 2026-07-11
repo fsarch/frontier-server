@@ -31,11 +31,26 @@ export async function executePreHooks(
   routePathRuleId: string,
   onDebug?: (message: string) => void,
 ): Promise<PreHookExecutionResult | PreHookErrorResult> {
-  if (!functionClient || !preHooks.enabled || preHooks.functions.length === 0) {
+  if (!functionClient) {
+    onDebug?.(`[hooks] skipping pre-hooks for route=${routePathRuleId}: functionClient is null (not initialized)`);
+    console.debug(`[worker][hooks] skipping pre-hooks for route=${routePathRuleId}: functionClient is null (not initialized)`);
     return { modifiedRequest: upstreamRequestData, error: false };
   }
 
-  onDebug?.(`executing pre-hooks for route: ${routePathRuleId}`);
+  if (!preHooks.enabled) {
+    onDebug?.(`[hooks] skipping pre-hooks for route=${routePathRuleId}: preHooks.enabled=false (check if function_server config has 'function_worker' and preHookId is set)`);
+    console.debug(`[worker][hooks] skipping pre-hooks for route=${routePathRuleId}: preHooks.enabled=false (check if function_server config has 'function_worker' and preHookId is set)`);
+    return { modifiedRequest: upstreamRequestData, error: false };
+  }
+
+  if (preHooks.functions.length === 0) {
+    onDebug?.(`[hooks] skipping pre-hooks for route=${routePathRuleId}: preHooks.functions is empty (no hook functions found for preHookId)`);
+    console.debug(`[worker][hooks] skipping pre-hooks for route=${routePathRuleId}: preHooks.functions is empty (no hook functions found for preHookId)`);
+    return { modifiedRequest: upstreamRequestData, error: false };
+  }
+
+  onDebug?.(`[hooks] executing pre-hooks for route=${routePathRuleId}, hookCount=${preHooks.functions.length}`);
+  console.debug(`[worker][hooks] executing pre-hooks for route=${routePathRuleId}, hookCount=${preHooks.functions.length}`);
 
   try {
     const preHookResult = await functionClient.executePreHooks(
@@ -76,11 +91,26 @@ export async function executePostHooks(
   routePathRuleId: string,
   onDebug?: (message: string) => void,
 ): Promise<PostHookExecutionResult> {
-  if (!functionClient || !postHooks.enabled || postHooks.functions.length === 0) {
+  if (!functionClient) {
+    onDebug?.(`[hooks] skipping post-hooks for route=${routePathRuleId}: functionClient is null (not initialized)`);
+    console.debug(`[worker][hooks] skipping post-hooks for route=${routePathRuleId}: functionClient is null (not initialized)`);
     return upstreamResponseData;
   }
 
-  onDebug?.(`executing post-hooks for route: ${routePathRuleId}`);
+  if (!postHooks.enabled) {
+    onDebug?.(`[hooks] skipping post-hooks for route=${routePathRuleId}: postHooks.enabled=false (check if function_server config has 'function_worker' and postHookId is set)`);
+    console.debug(`[worker][hooks] skipping post-hooks for route=${routePathRuleId}: postHooks.enabled=false (check if function_server config has 'function_worker' and postHookId is set)`);
+    return upstreamResponseData;
+  }
+
+  if (postHooks.functions.length === 0) {
+    onDebug?.(`[hooks] skipping post-hooks for route=${routePathRuleId}: postHooks.functions is empty (no hook functions found for postHookId)`);
+    console.debug(`[worker][hooks] skipping post-hooks for route=${routePathRuleId}: postHooks.functions is empty (no hook functions found for postHookId)`);
+    return upstreamResponseData;
+  }
+
+  onDebug?.(`[hooks] executing post-hooks for route=${routePathRuleId}, hookCount=${postHooks.functions.length}`);
+  console.debug(`[worker][hooks] executing post-hooks for route=${routePathRuleId}, hookCount=${postHooks.functions.length}`);
 
   try {
     const finalResponse = await functionClient.executePostHooks(
