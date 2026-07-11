@@ -13,10 +13,12 @@ import { ModuleConfiguration } from "@fsarch/server/configuration";
 import { WORKERS_CONFIG_VALIDATOR } from './workers-config.validator.js';
 import { WorkerLogController } from './worker-log.controller.js';
 import { HookModule } from "../../hooks/hook.module.js";
+import { WorkerBootstrapService } from '../worker-bootstrap.service.js';
+import { WorkerBootstrapController } from '../worker-bootstrap.controller.js';
 
 @Module({
-  providers: [WebsocketGateway],
-  controllers: [WorkerLogController],
+  providers: [WebsocketGateway, WorkerBootstrapService],
+  controllers: [WorkerLogController, WorkerBootstrapController],
   imports: [
     DomainModule,
     DomainGroupModule,
@@ -33,5 +35,6 @@ import { HookModule } from "../../hooks/hook.module.js";
       validationSchema: WORKERS_CONFIG_VALIDATOR,
     }),
   ],
+  exports: [WorkerBootstrapService],
 })
 export class WebsocketModule {}

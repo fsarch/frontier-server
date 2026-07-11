@@ -5,64 +5,14 @@ import {
 } from '@nestjs/websockets';
 import { Inject, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { WebSocket } from "ws";
-import { createHash } from "crypto";
-import { DomainGroupService } from "../../domain-group/domain-group.service.js";
-import { DomainService } from "../../domain-group/domain/domain.service.js";
-import { CachePolicyService } from "../../domain-group/cache-policy/cache-policy.service.js";
-import { CorsPolicyService } from "../../domain-group/cors-policy/cors-policy.service.js";
-import { LogPolicyService } from "../../domain-group/log-policy/log-policy.service.js";
-import { UpstreamGroupService } from "../../domain-group/upstream-group/upstream-group.service.js";
-import { UpstreamService } from "../../domain-group/upstream-group/upstream/upstream.service.js";
-import { PathRuleService } from "../../domain-group/path-rule/path-rule.service.js";
-import { UpstreamGroup } from "../../../database/entities/upstream-group.entity.js";
-import { Upstream } from "../../../database/entities/upstream.entity.js";
-import { DomainGroup } from "../../../database/entities/domain-group.entity.js";
-import { PathRule } from "../../../database/entities/path-rule.entity.js";
-import { DomainGroupDomain } from "../../../database/entities/domain-group-domain.entity.js";
-import { CachePolicy } from "../../../database/entities/cache-policy.entity.js";
-import { CorsPolicy } from "../../../database/entities/cors-policy.entity.js";
-import { LogPolicy } from "../../../database/entities/log-policy.entity.js";
 import { ModuleConfigurationService } from '@fsarch/server/configuration';
 import { ConfigWorkersType } from "../../../types/config.type.js";
-import { HookService } from "../../hooks/hook.service.js";
-import { Hook } from "../../../database/entities/hook.entity.js";
+import { WorkerBootstrapService, WorkerConfigSnapshot } from '../worker-bootstrap.service.js';
 
 type WebSocketResponseMessage<T> = {
   replyTo: string;
   payload: T;
 };
-
-type WorkerConfigSnapshot = {
-  domainGroups: TEntity<DomainGroup & { pathRules: Array<PathRule> }>;
-  domainGroupDomainsByDomain: TEntity<DomainGroupDomain>;
-  cachePolicies: TEntity<CachePolicy>;
-  corsPolicies: TEntity<CorsPolicy>;
-  logPolicies: TEntity<LogPolicy>;
-  hooks: TEntity<Hook>;
-  upstreamGroups: TEntity<UpstreamGroup & { upstreams: Array<Upstream> }>;
-};
-
-type TEntity<T> = {
-  entities: Record<string, T>;
-  ids: Array<string>;
-}
-
-function toEntityGroup<T>(data: Array<T>, selectId: (value: T) => string): { entities: Record<string, T>; ids: Array<string> } {
-  const entities = {};
-  const entityIds = [];
-
-  data.forEach(entity => {
-    const id = selectId(entity);
-
-    entities[id] = entity;
-    entityIds.push(id);
-  });
-
-  return {
-    entities,
-    ids: entityIds,
-  };
-}
 
 @WebSocketGateway({
   transports: 'websocket',
@@ -78,15 +28,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
   constructor(
     @Inject('WORKERS_CONFIG')
     private readonly workersConfigService: ModuleConfigurationService<ConfigWorkersType>,
-    private readonly domainGroupService: DomainGroupService,
-    private readonly domainGroupDomainService: DomainService,
-    private readonly cachePolicyService: CachePolicyService,
-    private readonly corsPolicyService: CorsPolicyService,
-    private readonly logPolicyService: LogPolicyService,
-    private readonly upstreamGroupService: UpstreamGroupService,
-    private readonly upstreamService: UpstreamService,
-    private readonly pathRuleService: PathRuleService,
-    private readonly hookService: HookService,
+    private readonly bootstrapService: WorkerBootstrapService,
   ) {
   }
 
@@ -114,73 +56,13 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
     }
   }
 
-  private async buildSnapshot(): Promise<WorkerConfigSnapshot> {
-    const [
-      domainGroups,
-      domainGroupDomains,
-      cachePolicies,
-      corsPolicies,
-      logPolicies,
-      upstreamGroups,
-      upstreams,
-      pathRules,
-      hooks,
-    ] = await Promise.all([
-      this.domainGroupService.List(),
-      this.domainGroupDomainService.List(),
-      this.cachePolicyService.List(),
-      this.corsPolicyService.List(),
-      this.logPolicyService.List(),
-      this.upstreamGroupService.List(),
-      this.upstreamService.List(),
-      this.pathRuleService.List(),
-      this.hookService.List(),
-    ]);
-
-    const upstreamGroupsEntity = toEntityGroup(upstreamGroups as Array<UpstreamGroup & { upstreams: Array<Upstream> }>, (upstreamGroup) => upstreamGroup.id);
-    upstreams.forEach((upstream) => {
-      if (!upstreamGroupsEntity.entities[upstream.upstreamGroupId]) {
-        return;
-      }
-
-      upstreamGroupsEntity.entities[upstream.upstreamGroupId].upstreams ??= [];
-      upstreamGroupsEntity.entities[upstream.upstreamGroupId].upstreams.push(upstream);
-    });
-
-    const domainGroupsEntity = toEntityGroup(domainGroups as Array<DomainGroup & { pathRules: Array<PathRule> }>, (domainGroup) => domainGroup.id);
-    pathRules.forEach((pathRule) => {
-      if (!domainGroupsEntity.entities[pathRule.domainGroupId]) {
-        return;
-      }
-
-      domainGroupsEntity.entities[pathRule.domainGroupId].pathRules ??= [];
-      domainGroupsEntity.entities[pathRule.domainGroupId].pathRules.push(pathRule);
-    });
-
-    return {
-      domainGroups: domainGroupsEntity,
-      domainGroupDomainsByDomain: toEntityGroup(domainGroupDomains, (domainGroupDomain) => domainGroupDomain.domainName),
-      cachePolicies: toEntityGroup(cachePolicies, (cachePolicy) => cachePolicy.id),
-      corsPolicies: toEntityGroup(corsPolicies, (corsPolicy) => corsPolicy.id),
-      logPolicies: toEntityGroup(logPolicies, (logPolicy) => logPolicy.id),
-      hooks: toEntityGroup(hooks, (hook) => hook.id),
-      upstreamGroups: upstreamGroupsEntity,
-    };
-  }
-
-  private getSnapshotChecksum(snapshot: WorkerConfigSnapshot): string {
-    return createHash('sha256')
-      .update(JSON.stringify(snapshot))
-      .digest('hex');
-  }
-
   private async syncAndBroadcastConfig(force: boolean): Promise<void> {
     if (this.clients.size === 0 && !force) {
       return;
     }
 
-    const snapshot = await this.buildSnapshot();
-    const checksum = this.getSnapshotChecksum(snapshot);
+    const snapshot = await this.bootstrapService.buildSnapshot();
+    const checksum = this.bootstrapService.getSnapshotChecksum(snapshot);
 
     if (!force && checksum === this.configChecksum) {
       return;
@@ -248,8 +130,8 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
     snapshot: WorkerConfigSnapshot;
   }>> {
     try {
-      const snapshot = await this.buildSnapshot();
-      const checksum = this.getSnapshotChecksum(snapshot);
+      const snapshot = await this.bootstrapService.buildSnapshot();
+      const checksum = this.bootstrapService.getSnapshotChecksum(snapshot);
 
       if (checksum !== this.configChecksum) {
         this.configChecksum = checksum;
