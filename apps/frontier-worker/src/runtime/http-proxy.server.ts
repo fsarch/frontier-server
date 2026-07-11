@@ -309,6 +309,7 @@ export class HttpProxyServer {
         method: upstreamRequestOptions.method,
         headers: upstreamRequestOptions.headers,
         body: upstreamRequestOptions.body,
+        redirect: 'manual',
       };
       if (route.upstream.protocol === 'https' && route.upstream.sslVerify === false) {
         this.debug(`ssl verification disabled for upstream ${route.upstream.host}:${route.upstream.port}`);
