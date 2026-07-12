@@ -10,14 +10,14 @@ import type { RequestType } from '../types/http/request.type.js';
 import type { ResponseType } from '../types/http/response.type.js';
 import { FunctionClient, FunctionServerConfig } from './function-client.js';
 import { BodyUtils } from '../utils/http/body.utils.js';
-import { compressResponseBody } from './response-compression.js';
+import { compressResponseBody } from './hooks/compression.hook.js';
 import {
   executePreHooks,
   executePostHooks,
 } from './function-hooks.js';
 import { HeadersUtils } from "../utils/http/index.js";
 import { PostHookPayload } from './models/post-hook-payload.js';
-import { buildCorsResponse, getOriginFromRequest } from './hooks/cors.hook.js';
+import { buildCorsResponse, getOriginFromRequest, buildCorsHeadersForHttp } from './hooks/cors.hook.js';
 
 type Metrics = {
   startedAt: number;
@@ -203,7 +203,7 @@ export class HttpProxyServer {
           return;
         }
 
-        const preflightHeaders = buildCorsHeaders(route.cors, requestOrigin, req.headers['access-control-request-headers']);
+        const preflightHeaders = buildCorsHeadersForHttp(route.cors, requestOrigin, req.headers['access-control-request-headers']);
         this.debug(`cors preflight accepted origin=${requestOrigin} path=${requestUrl.pathname}`);
         res.writeHead(204, preflightHeaders).end();
         await this.reportRequestLog(route, {
@@ -283,7 +283,7 @@ export class HttpProxyServer {
         this.debug(`short-circuit response from pre-hook, status=${shortCircuitResponse.statusCode}`);
         const responseHeaders = { ...shortCircuitResponse.headers };
         if (route.cors.enabled && requestOrigin) {
-          Object.assign(responseHeaders, buildCorsHeaders(route.cors, requestOrigin));
+          Object.assign(responseHeaders, buildCorsHeadersForHttp(route.cors, requestOrigin));
         }
         if (shortCircuitResponse.statusText) {
           res.statusMessage = shortCircuitResponse.statusText;
@@ -390,6 +390,21 @@ export class HttpProxyServer {
       const corsResponse = buildCorsResponse(corsPayload, route.cors);
       // endregion
 
+      // Create compression payload with CORS response
+      const compressionPayload = new PostHookPayload(
+        {
+          clientRequest: clientRequestData,
+          upstreamRequest: modifiedRequest,
+          response: corsResponse,
+        },
+        {
+          hookId: '$system.compression',
+          hookName: '$system.compression_processing',
+          functionId: '$system.build_in.compression',
+          routeId: route.pathRuleId,
+        },
+      );
+
       // Start with CORS response headers (which already include upstream headers + CORS)
       const responseHeaders = { ...corsResponse.headers };
 
@@ -417,27 +432,19 @@ export class HttpProxyServer {
       const supportsGzip = acceptsEncoding(acceptEncoding, 'gzip');
       this.debug(`client accepts gzip: ${supportsGzip} (accept-encoding: ${acceptEncoding})`);
 
-      const bodyToSend = BodyUtils.plainObjectToBody(corsResponse.body);
-      if (bodyToSend) {
+      if (corsResponse.body) {
         if (corsResponse.statusText) {
           res.statusMessage = corsResponse.statusText;
         }
 
-        // For binary data (Uint8Array), send directly without compression
-        if (bodyToSend instanceof Uint8Array) {
-          // Set content-length for binary data
-          responseHeadersSimple['content-length'] = String(bodyToSend.byteLength);
-          res.writeHead(corsResponse.statusCode, responseHeadersSimple);
-          res.end(bodyToSend);
-        } else {
-          const compressionResult = await compressResponseBody(bodyToSend, responseHeadersSimple, {
-            supportsGzip,
-            onDebug: (msg) => this.debug(msg),
-          });
+        // Apply compression with the compression payload
+        const compressionResult = await compressResponseBody(compressionPayload, {
+          supportsGzip,
+          onDebug: (msg) => this.debug(msg),
+        });
 
-          res.writeHead(corsResponse.statusCode, compressionResult.headers);
-          res.end(compressionResult.body);
-        }
+        res.writeHead(corsResponse.statusCode, compressionResult.headers);
+        res.end(compressionResult.body);
       } else {
         if (corsResponse.statusText) {
           res.statusMessage = corsResponse.statusText;
@@ -878,36 +885,6 @@ export function isCorsOriginAllowed(policy: RouteCorsPolicy, origin: string): bo
   }
 
   return policy.allowedOrigins.includes('*') || policy.allowedOrigins.includes(origin);
-}
-
-export function buildCorsHeaders(
-  policy: RouteCorsPolicy,
-  origin: string,
-  requestHeaders?: string | string[],
-): Record<string, string> {
-  const allowOrigin = policy.allowedOrigins.includes('*') && !policy.allowCredentials
-    ? '*'
-    : origin;
-
-  const result: Record<string, string> = {
-    'access-control-allow-origin': allowOrigin,
-    'access-control-allow-methods': 'GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS',
-    'access-control-max-age': '600',
-    vary: 'Origin',
-  };
-
-  const requestedHeaders = getSingleHeaderValue(requestHeaders);
-  // Sanitize requested headers: only allow valid header names (alphanumeric, dash, underscore)
-  const sanitizedHeaders = requestedHeaders && requestedHeaders.trim().length > 0
-    ? requestedHeaders.split(',').map(h => h.trim()).filter(h => /^[a-zA-Z0-9\-_]+$/.test(h)).join(',')
-    : '*';
-  result['access-control-allow-headers'] = sanitizedHeaders.length > 0 ? sanitizedHeaders : '*';
-
-  if (policy.allowCredentials) {
-    result['access-control-allow-credentials'] = 'true';
-  }
-
-  return result;
 }
 
 function isDebugEnabled(value: string | undefined): boolean {

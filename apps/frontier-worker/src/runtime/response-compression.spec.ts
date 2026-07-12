@@ -1,4 +1,50 @@
-import { compressResponseBody } from './response-compression.js';
+import { compressResponseBody } from './hooks/compression.hook.js';
+import { PostHookPayload } from './models/post-hook-payload.js';
+import type { RequestType } from '../types/http/request.type.js';
+import type { ResponseType } from '../types/http/response.type.js';
+
+/**
+ * Hilfsfunktion zum Erstellen eines PostHookPayload für Tests
+ */
+function createTestPostHookPayload(bodyText: string, headers: Record<string, string>): PostHookPayload {
+  const requestType: RequestType = {
+    type: 'request',
+    method: 'GET',
+    url: {
+      scheme: 'http',
+      host: 'localhost',
+      path: '/',
+      port: 80,
+      query: {},
+    },
+    headers: {},
+    body: { type: 'json', payload: null },
+  };
+
+  const responseType: ResponseType = {
+    type: 'response',
+    statusCode: 200,
+    statusText: 'OK',
+    headers: {},
+    body: { type: 'text', payload: bodyText },
+  };
+
+  // Header Konvertierung: Record<string, string> -> Record<string, string[]>
+  const responseHeaders: ResponseType['headers'] = {};
+  for (const [key, value] of Object.entries(headers)) {
+    responseHeaders[key] = [value];
+  }
+  responseType.headers = responseHeaders;
+
+  return new PostHookPayload(
+    {
+      clientRequest: requestType,
+      upstreamRequest: requestType,
+      response: responseType,
+    },
+    {},
+  );
+}
 
 describe('compressResponseBody', () => {
   describe('when gzip is supported and body is large enough', () => {
@@ -8,7 +54,8 @@ describe('compressResponseBody', () => {
         'content-type': 'text/plain',
       };
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
       });
@@ -34,7 +81,8 @@ describe('compressResponseBody', () => {
         'vary': 'Origin',
       };
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
       });
@@ -48,7 +96,8 @@ describe('compressResponseBody', () => {
         'vary': 'Origin, Accept-Encoding',
       };
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
       });
@@ -62,7 +111,8 @@ describe('compressResponseBody', () => {
         'transfer-encoding': 'chunked',
       };
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
       });
@@ -75,7 +125,8 @@ describe('compressResponseBody', () => {
       const debugMessages: string[] = [];
       const headers: Record<string, string> = {};
 
-      await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
         onDebug: (msg) => debugMessages.push(msg),
@@ -94,7 +145,8 @@ describe('compressResponseBody', () => {
         'content-type': 'text/plain',
       };
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: false,
         minSizeBytes: 100,
       });
@@ -108,7 +160,8 @@ describe('compressResponseBody', () => {
       const bodyText = 'x'.repeat(200);
       const debugMessages: string[] = [];
 
-      await compressResponseBody(bodyText, {}, {
+      const hookPayload = createTestPostHookPayload(bodyText, {});
+      await compressResponseBody(hookPayload, {
         supportsGzip: false,
         onDebug: (msg) => debugMessages.push(msg),
       });
@@ -124,7 +177,8 @@ describe('compressResponseBody', () => {
         'content-type': 'text/plain',
       };
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
       });
@@ -137,7 +191,8 @@ describe('compressResponseBody', () => {
       const bodyText = 'x'.repeat(50);
       const headers: Record<string, string> = {};
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
       });
@@ -150,7 +205,8 @@ describe('compressResponseBody', () => {
       const bodyText = 'x'.repeat(100);
       const headers: Record<string, string> = {};
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
       });
@@ -164,7 +220,8 @@ describe('compressResponseBody', () => {
       const bodyText = 'x'.repeat(101);
       const headers: Record<string, string> = {};
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
       });
@@ -180,7 +237,8 @@ describe('compressResponseBody', () => {
       const bodyText = '你好'.repeat(50); // 100 chars, 300 bytes
       const headers: Record<string, string> = {};
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
       });
@@ -196,7 +254,8 @@ describe('compressResponseBody', () => {
       const bodyText = '';
       const headers: Record<string, string> = {};
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
       });
@@ -211,7 +270,8 @@ describe('compressResponseBody', () => {
       const bodyText = 'x'.repeat(99);
       const headers: Record<string, string> = {};
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
       });
 
@@ -223,7 +283,8 @@ describe('compressResponseBody', () => {
       const bodyText = 'x'.repeat(101);
       const headers: Record<string, string> = {};
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
       });
 
@@ -240,7 +301,8 @@ describe('compressResponseBody', () => {
         'x-custom-header': 'value',
       };
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
       });
 
@@ -255,7 +317,8 @@ describe('compressResponseBody', () => {
         'content-length': '200',
       };
 
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
       });
 
@@ -272,7 +335,8 @@ describe('compressResponseBody', () => {
 
       // Note: actual gzip compression failures are rare in Node.js,
       // but we test the error handling path anyway
-      const result = await compressResponseBody(bodyText, headers, {
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
       });
@@ -291,7 +355,8 @@ describe('compressResponseBody', () => {
       const bodyText = 'x'.repeat(200);
       const debugMessages: string[] = [];
 
-      await compressResponseBody(bodyText, {}, {
+      const hookPayload = createTestPostHookPayload(bodyText, {});
+      await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
         onDebug: (msg) => debugMessages.push(msg),
@@ -323,7 +388,8 @@ describe('compressResponseBody', () => {
         'content-type': 'application/json',
       };
 
-      const result = await compressResponseBody(jsonPayload, headers, {
+      const hookPayload = createTestPostHookPayload(jsonPayload, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
       });
@@ -360,7 +426,8 @@ describe('compressResponseBody', () => {
         'content-type': 'text/html; charset=utf-8',
       };
 
-      const result = await compressResponseBody(htmlPayload, headers, {
+      const hookPayload = createTestPostHookPayload(htmlPayload, headers);
+      const result = await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
       });

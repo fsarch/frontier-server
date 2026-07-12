@@ -23,7 +23,7 @@ export function getOriginFromRequest(request: RequestType): string | undefined {
  * Build CORS headers for a given policy and origin.
  * This is a helper function used by buildCorsResponse.
  */
-function buildCorsHeaders(
+export function buildCorsHeaders(
   policy: RouteCorsPolicy,
   origin: string,
   requestHeaders?: string | string[],
@@ -50,6 +50,25 @@ function buildCorsHeaders(
     result['access-control-allow-credentials'] = ['true'];
   }
 
+  return result;
+}
+
+/**
+ * Build CORS headers for HTTP response (Record<string, string> format).
+ * This is used when setting headers directly on ServerResponse.
+ */
+export function buildCorsHeadersForHttp(
+  policy: RouteCorsPolicy,
+  origin: string,
+  requestHeaders?: string | string[],
+): Record<string, string> {
+  const corsHeaders = buildCorsHeaders(policy, origin, requestHeaders);
+  const result: Record<string, string> = {};
+  for (const [key, values] of Object.entries(corsHeaders)) {
+    if (values.length > 0) {
+      result[key] = values[0];
+    }
+  }
   return result;
 }
 
