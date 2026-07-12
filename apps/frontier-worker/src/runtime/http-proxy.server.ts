@@ -16,7 +16,8 @@ import {
   executePostHooks,
 } from './function-hooks.js';
 import { HeadersUtils } from "../utils/http/index.js";
-import { PostHookPayload } from './hooks/post-hook-payload.js';
+import { PostHookPayload } from './models/post-hook-payload.js';
+import { buildCorsResponse, getOriginFromRequest } from './hooks/cors.hook.js';
 
 type Metrics = {
   startedAt: number;
@@ -25,7 +26,7 @@ type Metrics = {
   totalErrors: number;
 };
 
-type RouteCorsPolicy = {
+export type RouteCorsPolicy = {
   enabled: boolean;
   allowCredentials: boolean;
   allowedOrigins: string[];
@@ -915,39 +916,6 @@ function isDebugEnabled(value: string | undefined): boolean {
   }
 
   return value === '1' || value.toLowerCase() === 'true' || value.toLowerCase() === 'debug';
-}
-
-/**
- * Extrahiere den Origin-Header aus einem RequestType.
- * Nützlich für CORS-Processing, wenn die Request-Daten als RequestType vorliegen.
- */
-function getOriginFromRequest(request: RequestType): string | undefined {
-  return getSingleHeaderValue(request.headers.origin);
-}
-
-/**
- * Erstellt eine Response mit CORS-Headern aus einem PostHookPayload.
- * Der Origin wird automatisch aus dem clientRequest extrahiert.
- * Die upstream Headers werden aus corsPayload.payload.response.headers entnommen.
- */
-function buildCorsResponse(
-  corsPayload: PostHookPayload,
-  corsPolicy: RouteCorsPolicy,
-): ResponseType {
-  // Extrahiere Origin aus dem clientRequest im Payload
-  const origin = getOriginFromRequest(corsPayload.payload.clientRequest);
-
-  // Extrahiere die Headers aus der Response im Payload
-  const responseHeaders = { ...corsPayload.payload.response.headers };
-
-  if (corsPolicy.enabled && origin) {
-    Object.assign(responseHeaders, buildCorsHeaders(corsPolicy, origin));
-  }
-
-  return {
-    ...corsPayload.payload.response,
-    headers: responseHeaders,
-  };
 }
 
 function buildIncomingUrl(hostHeader: string | undefined, requestUrl: URL): string {

@@ -4,8 +4,8 @@ import type { ResponseType } from '../types/http/response.type.js';
 import { BodyUtils } from '../utils/http/body.utils.js';
 import { CompiledHookFunction, CompiledHooks } from './compiled-config.js';
 import { PostHookExecutionResult, PreHookExecutionResult } from "./function-hooks.js";
-import { PreHookPayload } from './hooks/pre-hook-payload.js';
-import { PostHookPayload } from './hooks/post-hook-payload.js';
+import { PreHookPayload } from './models/pre-hook-payload.js';
+import { PostHookPayload } from './models/post-hook-payload.js';
 
 // Typ für Hook-Konfiguration
 export type HookConfig = {
