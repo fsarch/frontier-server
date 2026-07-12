@@ -17,7 +17,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
-    "test:debug": "vitest run --inspect-brk"
+    "test:debug": "vitest --inspect-brk --inspect --logHeapUsage --threads=false",
+    "test:e2e": "vitest run --config ./vitest.e2e.config.ts"
   },
   "dependencies": {
     "@fsarch/server": "^0.0.8",
@@ -44,6 +45,8 @@
     "@nestjs/cli": "^11.0.24",
     "@nestjs/schematics": "^11.1.0",
     "@nestjs/testing": "^11.1.28",
+    "@swc/core": "^1.15.43",
+    "@swc/jest": "^0.2.39",
     "@types/express": "^5.0.6",
     "@types/node": "^24.13.3",
     "@types/ws": "^8.5.13",
@@ -60,6 +63,7 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.0",
+    "unplugin-swc": "^1.0.0",
     "vitest": "^2.1.3"
   }
 }
