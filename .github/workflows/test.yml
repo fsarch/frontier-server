@@ -1,0 +1,44 @@
+name: CI - Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: frontier-api
+            workspace: apps/frontier-api
+          - name: frontier-worker
+            workspace: apps/frontier-worker
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: 'npm'
+
+      - name: Configure npm for GitHub Packages (fsarch scope)
+        # Configure registry only for the @fsarch scope and write auth token
+        run: |
+          echo "@fsarch:registry=https://npm.pkg.github.com" >> ~/.npmrc
+          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests for {{ matrix.name }}
+        run: npm test --workspace ${{ matrix.workspace }}
+        env:
+          CI: true

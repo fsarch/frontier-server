@@ -22,6 +22,18 @@ export default defineConfig({
   plugins: [
     swc.vite({
       module: { type: 'es6' },
+      jsc: {
+        target: 'es2022',
+        parser: {
+          syntax: 'typescript',
+          decorators: true,
+          dynamicImport: true,
+        },
+        transform: {
+          legacyDecorator: true,
+          decoratorMetadata: true,
+        },
+      },
     }),
   ],
   resolve: {

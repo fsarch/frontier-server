@@ -1,7 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
-import { FrontierApiController } from './frontier-api.controller.js';
-import { FrontierApiService } from './frontier-api.service.js';
 import { ApiModule } from './api/api.module.js';
 
 @Module({
@@ -9,7 +7,7 @@ import { ApiModule } from './api/api.module.js';
     ScheduleModule.forRoot(),
     ApiModule,
   ],
-  controllers: [FrontierApiController],
-  providers: [FrontierApiService],
+  controllers: [],
+  providers: [],
 })
 export class FrontierApiModule {}

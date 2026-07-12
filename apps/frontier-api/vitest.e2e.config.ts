@@ -8,5 +8,20 @@ export default defineConfig({
     root: './',
     environment: 'node',
   },
-  plugins: [swc.vite()],
+  plugins: [
+    swc.vite({
+      jsc: {
+        target: 'es2022',
+        parser: {
+          syntax: 'typescript',
+          decorators: true,
+          dynamicImport: true,
+        },
+        transform: {
+          legacyDecorator: true,
+          decoratorMetadata: true,
+        },
+      },
+    }),
+  ],
 });
