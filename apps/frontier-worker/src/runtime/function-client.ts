@@ -1,11 +1,11 @@
 import { STATUS_CODES } from 'http';
-import type { PostHookType } from '../types/hooks/post-hook.type.js';
-import type { PreHookType } from '../types/hooks/pre-hook.type.js';
 import type { RequestType } from '../types/http/request.type.js';
 import type { ResponseType } from '../types/http/response.type.js';
 import { BodyUtils } from '../utils/http/body.utils.js';
 import { CompiledHookFunction, CompiledHooks } from './compiled-config.js';
 import { PostHookExecutionResult, PreHookExecutionResult } from "./function-hooks.js";
+import { PreHookPayload } from './hooks/pre-hook-payload.js';
+import { PostHookPayload } from './hooks/post-hook-payload.js';
 
 // Typ für Hook-Konfiguration
 export type HookConfig = {
@@ -54,7 +54,7 @@ export class FunctionClient {
 
   public async executeHook(
     hook: CompiledHookFunction,
-    hookPayload: PreHookType | PostHookType,
+    hookPayload: PreHookPayload | PostHookPayload,
   ): Promise<{ statusCode: number; headers: Record<string, string>; body: unknown }> {
     const functionConfig = this.getFunctionConfig();
     if (!functionConfig) {
@@ -293,19 +293,18 @@ export class FunctionClient {
     hook: CompiledHookFunction,
     clientRequestData: RequestType,
     upstreamRequestData: RequestType,
-  ): PreHookType {
-    return {
-      type: 'fsarch.frontier.pre_hook',
-      payload: {
+  ): PreHookPayload {
+    return new PreHookPayload(
+      {
         clientRequest: clientRequestData,
         upstreamRequest: upstreamRequestData,
       },
-      metadata: {
+      {
         hookId: hook.id,
         hookName: hook.name,
         functionId: hook.functionId,
       },
-    };
+    );
   }
 
   private buildPostHookPayload(
@@ -313,20 +312,19 @@ export class FunctionClient {
     clientRequestData: RequestType,
     upstreamRequestData: RequestType,
     responseData: ResponseType,
-  ): PostHookType {
-    return {
-      type: 'fsarch.frontier.post_hook',
-      payload: {
+  ): PostHookPayload {
+    return new PostHookPayload(
+      {
         clientRequest: clientRequestData,
         upstreamRequest: upstreamRequestData,
         response: responseData,
       },
-      metadata: {
+      {
         hookId: hook.id,
         hookName: hook.name,
         functionId: hook.functionId,
       },
-    };
+    );
   }
 }
 
