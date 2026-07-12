@@ -221,5 +221,32 @@ describe('RequestUtils', () => {
             const parsed = JSON.parse(resultBodyText);
             expect(parsed).toEqual(bodyData);
         });
+
+        it('should maintain binary.uint8array body through roundtrip', async () => {
+            const binaryData = new Uint8Array([1, 2, 3, 4, 5]);
+            const requestType: RequestType = {
+                type: 'request',
+                method: 'POST',
+                url: {
+                    scheme: 'https',
+                    host: 'api.example.com',
+                    path: '/upload',
+                    port: 443,
+                    query: {},
+                },
+                headers: {},
+                body: {
+                    type: 'binary.uint8array',
+                    payload: binaryData,
+                },
+            };
+
+            const result = RequestUtils.plainObjectToRequest(requestType);
+
+            // For binary data, the body should be a Uint8Array
+            const resultBody = await result.arrayBuffer();
+            const resultBinary = new Uint8Array(resultBody);
+            expect(resultBinary).toEqual(binaryData);
+        });
     });
 });

@@ -14,4 +14,10 @@ export interface TextBodyType {
   payload: string;
 }
 
-export type BodyType = JsonBodyType | TextBodyType;
+export interface BinaryUint8ArrayBodyType {
+  type: 'binary.uint8array';
+
+  payload: Uint8Array;
+}
+
+export type BodyType = JsonBodyType | TextBodyType | BinaryUint8ArrayBodyType;

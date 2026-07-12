@@ -485,7 +485,7 @@ function isBodyType(value: unknown): value is ResponseType['body'] {
     value
     && typeof value === 'object'
     && 'type' in value
-    && ((value as { type?: unknown }).type === 'json' || (value as { type?: unknown }).type === 'text')
+    && ((value as { type?: unknown }).type === 'json' || (value as { type?: unknown }).type === 'text' || (value as { type?: unknown }).type === 'binary.uint8array')
     && 'payload' in value,
   );
 }

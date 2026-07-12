@@ -33,7 +33,8 @@ function plainObjectToResponse(responseType: ResponseType): Response {
         headers,
     };
 
-    return new Response(body || null, responseInit);
+    // Uint8Array is a valid BodyInit type (via BufferSource)
+    return new Response(body as BodyInit || null, responseInit);
 }
 
 export const ResponseUtils = {

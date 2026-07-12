@@ -422,13 +422,21 @@ export class HttpProxyServer {
           res.statusMessage = corsResponse.statusText;
         }
 
-        const compressionResult = await compressResponseBody(bodyToSend, responseHeadersSimple, {
-          supportsGzip,
-          onDebug: (msg) => this.debug(msg),
-        });
+        // For binary data (Uint8Array), send directly without compression
+        if (bodyToSend instanceof Uint8Array) {
+          // Set content-length for binary data
+          responseHeadersSimple['content-length'] = String(bodyToSend.byteLength);
+          res.writeHead(corsResponse.statusCode, responseHeadersSimple);
+          res.end(bodyToSend);
+        } else {
+          const compressionResult = await compressResponseBody(bodyToSend, responseHeadersSimple, {
+            supportsGzip,
+            onDebug: (msg) => this.debug(msg),
+          });
 
-        res.writeHead(corsResponse.statusCode, compressionResult.headers);
-        res.end(compressionResult.body);
+          res.writeHead(corsResponse.statusCode, compressionResult.headers);
+          res.end(compressionResult.body);
+        }
       } else {
         if (corsResponse.statusText) {
           res.statusMessage = corsResponse.statusText;
@@ -760,7 +768,7 @@ async function buildRequestType(
 function requestTypeToProxyRequest(request: RequestType): {
   method: string;
   headers: Record<string, string>;
-  body?: string;
+  body?: string | Uint8Array;
 } {
   const headers: Record<string, string> = {};
 
@@ -774,10 +782,15 @@ function requestTypeToProxyRequest(request: RequestType): {
 
   const body = BodyUtils.plainObjectToBody(request.body);
 
+  // For binary data, check byteLength; for string, check length
+  const hasBody = body instanceof Uint8Array 
+    ? body.byteLength > 0 
+    : (body as string).length > 0;
+
   return {
     method: request.method,
     headers,
-    body: body.length > 0 ? body : undefined,
+    body: hasBody ? body : undefined,
   };
 }
 

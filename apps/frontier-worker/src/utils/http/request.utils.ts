@@ -48,8 +48,9 @@ function plainObjectToRequest(requestType: RequestType): Request {
     };
 
     // Only set body if method allows it (not GET or HEAD)
+    // Uint8Array is a valid BodyInit type (via BufferSource)
     if (body && !['GET', 'HEAD'].includes(requestType.method)) {
-        requestInit.body = body;
+        requestInit.body = body as BodyInit;
     }
 
     return new Request(url.toString(), requestInit);

@@ -256,5 +256,52 @@ describe('ResponseUtils', () => {
             expect(result.headers.get('X-Custom-1')).toBe('value1');
             expect(result.headers.get('X-Custom-2')).toBe('value2');
         });
+
+        it('should convert ResponseType with binary.uint8array to Response', async () => {
+            const binaryData = new Uint8Array([65, 66, 67, 68]); // 'ABCD' in ASCII
+            const responseType = {
+                type: 'response',
+                statusCode: 200,
+                statusText: 'OK',
+                headers: { 'Content-Type': ['application/octet-stream'] },
+                body: {
+                    type: 'binary.uint8array',
+                    payload: binaryData,
+                },
+            };
+
+            const result = ResponseUtils.plainObjectToResponse(responseType);
+
+            expect(result.status).toBe(200);
+            expect(result.statusText).toBe('OK');
+
+            const resultBody = await result.arrayBuffer();
+            const resultBinary = new Uint8Array(resultBody);
+            expect(resultBinary).toEqual(binaryData);
+        });
+
+        it('should handle ResponseType with binary.uint8array body', async () => {
+            const binaryData = new Uint8Array([72, 101, 108, 108, 111]); // 'Hello' in ASCII
+            const responseType = {
+                type: 'response',
+                statusCode: 200,
+                statusText: 'OK',
+                headers: { 'Content-Type': ['application/octet-stream'] },
+                body: {
+                    type: 'binary.uint8array',
+                    payload: binaryData,
+                },
+            };
+
+            const response = ResponseUtils.plainObjectToResponse(responseType);
+            const result = await ResponseUtils.responseToPlainObject(response);
+
+            expect(result.statusCode).toBe(200);
+            expect(result.type).toBe('response');
+            // Note: When reading from a Response with Uint8Array body, the body is a ReadableStream
+            // and will be parsed as text by bodyToPlainObject, since we can't auto-detect binary data
+            // This is expected behavior - binary.uint8array is for internal use only
+            expect(result.body.type).toBe('text');
+        });
     });
 });

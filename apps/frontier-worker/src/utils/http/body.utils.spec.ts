@@ -148,5 +148,77 @@ describe('BodyUtils', () => {
             const result = BodyUtils.plainObjectToBody(bodyType);
             expect(result).toBe('plain text');
         });
+
+        it('should convert binary.uint8array BodyType to Uint8Array', () => {
+            const binaryData = new Uint8Array([1, 2, 3, 4, 5]);
+            const bodyType = {
+                type: 'binary.uint8array',
+                payload: binaryData,
+            };
+
+            const result = BodyUtils.plainObjectToBody(bodyType);
+            expect(result).toBeInstanceOf(Uint8Array);
+            expect(result).toEqual(binaryData);
+        });
+    });
+
+    describe('bodyToPlainObject with binary data', () => {
+        it('should convert Uint8Array to binary.uint8array BodyType', async () => {
+            const binaryData = new Uint8Array([10, 20, 30, 40]);
+            const result = await BodyUtils.bodyToPlainObject(binaryData);
+
+            expect(result.type).toBe('binary.uint8array');
+            expect(result.payload).toBeInstanceOf(Uint8Array);
+            expect(result.payload).toEqual(binaryData);
+        });
+
+        it('should convert ArrayBuffer to binary.uint8array BodyType', async () => {
+            const arrayBuffer = new ArrayBuffer(4);
+            const uint8View = new Uint8Array(arrayBuffer);
+            uint8View[0] = 1;
+            uint8View[1] = 2;
+            uint8View[2] = 3;
+            uint8View[3] = 4;
+
+            const result = await BodyUtils.bodyToPlainObject(arrayBuffer);
+
+            expect(result.type).toBe('binary.uint8array');
+            expect(result.payload).toBeInstanceOf(Uint8Array);
+            expect(result.payload).toEqual(new Uint8Array([1, 2, 3, 4]));
+        });
+
+        it('should convert empty Uint8Array to binary.uint8array BodyType', async () => {
+            const emptyData = new Uint8Array([]);
+            const result = await BodyUtils.bodyToPlainObject(emptyData);
+
+            expect(result.type).toBe('binary.uint8array');
+            expect(result.payload).toBeInstanceOf(Uint8Array);
+            expect(result.payload).toHaveLength(0);
+        });
+    });
+
+    describe('roundtrip conversion with binary data', () => {
+        it('should convert Uint8Array to BodyType and back to Uint8Array', async () => {
+            const original = new Uint8Array([255, 128, 64, 32]);
+            const bodyType = await BodyUtils.bodyToPlainObject(original);
+            const result = BodyUtils.plainObjectToBody(bodyType);
+
+            expect(result).toBeInstanceOf(Uint8Array);
+            expect(result).toEqual(original);
+        });
+
+        it('should convert ArrayBuffer to BodyType and back to Uint8Array', async () => {
+            const original = new ArrayBuffer(8);
+            const view = new Uint8Array(original);
+            for (let i = 0; i < 8; i++) {
+                view[i] = i * 32;
+            }
+
+            const bodyType = await BodyUtils.bodyToPlainObject(original);
+            const result = BodyUtils.plainObjectToBody(bodyType);
+
+            expect(result).toBeInstanceOf(Uint8Array);
+            expect(result).toEqual(view);
+        });
     });
 });
