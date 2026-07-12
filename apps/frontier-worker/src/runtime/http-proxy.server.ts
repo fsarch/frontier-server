@@ -16,6 +16,7 @@ import {
   executePostHooks,
 } from './function-hooks.js';
 import { HeadersUtils } from "../utils/http/index.js";
+import { PostHookPayload } from './hooks/post-hook-payload.js';
 
 type Metrics = {
   startedAt: number;
@@ -358,7 +359,7 @@ export class HttpProxyServer {
       };
 
       // Execute post-hooks if available
-      const finalResponse = await executePostHooks(
+      const postHooksResponse = await executePostHooks(
         this.functionClient,
         route.postHooks,
         clientRequestData,
@@ -368,7 +369,28 @@ export class HttpProxyServer {
         (msg) => this.debug(msg),
       );
 
-      const responseHeaders = HeadersUtils.headersToPlainObject(upstreamRes.headers);
+      // region Update Request with CORS headers
+      // Erzeuge PostHookPayload für CORS-Processing
+      const corsPayload = new PostHookPayload(
+        {
+          clientRequest: clientRequestData,
+          upstreamRequest: modifiedRequest,
+          response: postHooksResponse,
+        },
+        {
+          hookId: '$system.cors',
+          hookName: '$system.cors_response',
+          functionId: '$system.build_in.cors',
+          routeId: route.pathRuleId,
+        },
+      );
+
+      // Build response with CORS headers
+      const corsResponse = buildCorsResponse(corsPayload, route.cors);
+      // endregion
+
+      // Start with CORS response headers (which already include upstream headers + CORS)
+      const responseHeaders = { ...corsResponse.headers };
 
       // Since we've decoded the upstream response, remove content-encoding header
       // (we'll recalculate it based on our response)
@@ -376,32 +398,28 @@ export class HttpProxyServer {
       delete responseHeaders['content-length'];
       delete responseHeaders['transfer-encoding'];
 
-      if (route.cors.enabled && requestOrigin) {
-        Object.assign(responseHeaders, buildCorsHeaders(route.cors, requestOrigin));
-      }
-
       const responseHeadersSimple: Record<string, string> = {};
 
       // Apply modified headers from post-hooks if present (validate first)
-      if (finalResponse.headers) {
-        for (const [name, values] of Object.entries(finalResponse.headers)) {
+      if (corsResponse.headers) {
+        for (const [name, values] of Object.entries(corsResponse.headers)) {
           if (typeof name === 'string' && /^[a-zA-Z0-9\-]+$/.test(name) && Array.isArray(values) && values.length > 0) {
             responseHeadersSimple[name] = values.join(',');
           }
         }
       }
 
-      this.debug(`upstream response status=${finalResponse.statusCode} upstream=${upstreamUrl}`);
+      this.debug(`upstream response status=${corsResponse.statusCode} upstream=${upstreamUrl}`);
 
       // Check if client accepts gzip encoding
       const acceptEncoding = getSingleHeaderValue(req.headers['accept-encoding']);
       const supportsGzip = acceptsEncoding(acceptEncoding, 'gzip');
       this.debug(`client accepts gzip: ${supportsGzip} (accept-encoding: ${acceptEncoding})`);
 
-      const bodyToSend = BodyUtils.plainObjectToBody(finalResponse.body);
+      const bodyToSend = BodyUtils.plainObjectToBody(corsResponse.body);
       if (bodyToSend) {
-        if (finalResponse.statusText) {
-          res.statusMessage = finalResponse.statusText;
+        if (corsResponse.statusText) {
+          res.statusMessage = corsResponse.statusText;
         }
 
         const compressionResult = await compressResponseBody(bodyToSend, responseHeadersSimple, {
@@ -409,13 +427,13 @@ export class HttpProxyServer {
           onDebug: (msg) => this.debug(msg),
         });
 
-        res.writeHead(finalResponse.statusCode, compressionResult.headers);
+        res.writeHead(corsResponse.statusCode, compressionResult.headers);
         res.end(compressionResult.body);
       } else {
-        if (finalResponse.statusText) {
-          res.statusMessage = finalResponse.statusText;
+        if (corsResponse.statusText) {
+          res.statusMessage = corsResponse.statusText;
         }
-        res.writeHead(finalResponse.statusCode, responseHeaders);
+        res.writeHead(corsResponse.statusCode, responseHeaders);
         res.end();
       }
 
@@ -426,7 +444,7 @@ export class HttpProxyServer {
         upstreamMethod: modifiedRequest.method,
         upstreamUrl,
         upstreamHeaders: requestTypeHeadersToRecord(modifiedRequest.headers),
-        responseStatusCode: finalResponse.statusCode,
+        responseStatusCode: corsResponse.statusCode,
         requestTimeMs: Date.now() - requestStartedAt,
       });
     } catch (error) {
@@ -884,6 +902,39 @@ function isDebugEnabled(value: string | undefined): boolean {
   }
 
   return value === '1' || value.toLowerCase() === 'true' || value.toLowerCase() === 'debug';
+}
+
+/**
+ * Extrahiere den Origin-Header aus einem RequestType.
+ * Nützlich für CORS-Processing, wenn die Request-Daten als RequestType vorliegen.
+ */
+function getOriginFromRequest(request: RequestType): string | undefined {
+  return getSingleHeaderValue(request.headers.origin);
+}
+
+/**
+ * Erstellt eine Response mit CORS-Headern aus einem PostHookPayload.
+ * Der Origin wird automatisch aus dem clientRequest extrahiert.
+ * Die upstream Headers werden aus corsPayload.payload.response.headers entnommen.
+ */
+function buildCorsResponse(
+  corsPayload: PostHookPayload,
+  corsPolicy: RouteCorsPolicy,
+): ResponseType {
+  // Extrahiere Origin aus dem clientRequest im Payload
+  const origin = getOriginFromRequest(corsPayload.payload.clientRequest);
+
+  // Extrahiere die Headers aus der Response im Payload
+  const responseHeaders = { ...corsPayload.payload.response.headers };
+
+  if (corsPolicy.enabled && origin) {
+    Object.assign(responseHeaders, buildCorsHeaders(corsPolicy, origin));
+  }
+
+  return {
+    ...corsPayload.payload.response,
+    headers: responseHeaders,
+  };
 }
 
 function buildIncomingUrl(hostHeader: string | undefined, requestUrl: URL): string {
