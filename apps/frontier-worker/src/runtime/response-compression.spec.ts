@@ -139,7 +139,7 @@ describe('compressResponseBody', () => {
   });
 
   describe('when gzip is not supported', () => {
-    it('should return uncompressed body with original headers', async () => {
+    it('should return uncompressed body with original headers (but with updated content-length because of uncompress)', async () => {
       const bodyText = 'x'.repeat(200);
       const headers: Record<string, string> = {
         'content-type': 'text/plain',
@@ -152,8 +152,8 @@ describe('compressResponseBody', () => {
       });
 
       expect(result.body).toBe(bodyText);
-      expect(result.headers).toEqual(headers);
       expect(result.headers['content-encoding']).toBeUndefined();
+      expect(result.headers['content-length']).toEqual('200');
     });
 
     it('should log debug message when not compressing', async () => {
