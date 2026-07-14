@@ -445,8 +445,6 @@ export class HttpProxyServer {
           onDebug: (msg) => this.debug(msg),
         });
 
-        console.log(compressionResult.body, compressionResult.headers);
-
         res.writeHead(response.statusCode, compressionResult.headers);
         res.end(compressionResult.body);
       } else {
