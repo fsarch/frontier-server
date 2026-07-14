@@ -620,7 +620,6 @@ export function appendForwardedHeaders(
   appendForwardedHeader(headers, 'x-forwarded-host', hostHeader);
   appendForwardedHeader(headers, 'x-forwarded-proto', proto);
   appendForwardedHeader(headers, 'x-forwarded-port', port);
-  appendForwardedHeader(headers, 'x-forwarded-prefix', prefix);
 }
 
 function resolveForwardedProto(headers: IncomingHttpHeaders, isTlsRequest: boolean): string {

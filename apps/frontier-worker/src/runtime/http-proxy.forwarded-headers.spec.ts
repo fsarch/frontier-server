@@ -11,7 +11,6 @@ describe('appendForwardedHeaders', () => {
     expect(upstreamHeaders['x-forwarded-host']).toBe('api.example.com:8080');
     expect(upstreamHeaders['x-forwarded-proto']).toBe('http');
     expect(upstreamHeaders['x-forwarded-port']).toBe('8080');
-    expect(upstreamHeaders['x-forwarded-prefix']).toBe('/api');
   });
 
   it('appends to existing forwarded chain values', () => {
@@ -19,7 +18,6 @@ describe('appendForwardedHeaders', () => {
       'x-forwarded-host': 'edge.example.com',
       'x-forwarded-proto': 'https',
       'x-forwarded-port': '443',
-      'x-forwarded-prefix': '/edge',
     };
     const incomingHeaders: IncomingHttpHeaders = {
       'x-forwarded-proto': 'https',
@@ -31,7 +29,6 @@ describe('appendForwardedHeaders', () => {
     expect(upstreamHeaders['x-forwarded-host']).toBe('edge.example.com, worker.internal:3000');
     expect(upstreamHeaders['x-forwarded-proto']).toBe('https, https');
     expect(upstreamHeaders['x-forwarded-port']).toBe('443, 443');
-    expect(upstreamHeaders['x-forwarded-prefix']).toBe('/edge, /api');
   });
 
   it('uses tls socket state when x-forwarded-proto is missing and defaults prefix for catch-all routes', () => {
@@ -44,7 +41,6 @@ describe('appendForwardedHeaders', () => {
 
     expect(upstreamHeaders['x-forwarded-proto']).toBe('https');
     expect(upstreamHeaders['x-forwarded-port']).toBe('443');
-    expect(upstreamHeaders['x-forwarded-prefix']).toBe('/');
   });
 
   it('supports ipv6 host header with explicit port', () => {
