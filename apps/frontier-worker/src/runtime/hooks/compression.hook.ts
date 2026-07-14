@@ -32,7 +32,7 @@ function headersToRecord(headers: Record<string, string[]>): Record<string, stri
 /**
  * Führt Response-Body-Kompression durch, basierend auf dem PostHookPayload.
  * Extrahiere body und headers automatisch aus dem Payload.
- * 
+ *
  * @param hookPayload - Der PostHookPayload mit clientRequest, upstreamRequest und response
  * @param options - Kompressionsoptionen (supportsGzip, minSizeBytes, onDebug)
  * @returns CompressionResult mit komprimiertem/unkomprimiertem Body und Headern
@@ -42,17 +42,20 @@ export async function compressResponseBody(
   options: CompressionOptions,
 ): Promise<CompressionResult> {
   const { supportsGzip, minSizeBytes = 100, onDebug } = options;
-  
+
   // Extrahiere body und headers aus dem Payload
   const bodyToSend = BodyUtils.plainObjectToBody(hookPayload.payload.response.body);
   const responseHeaders = headersToRecord(hookPayload.payload.response.headers);
-  
+
+  responseHeaders['content-length'] = Buffer.byteLength(bodyToSend, 'utf8').toString();
+  delete responseHeaders['content-encoding'];
+
   // Nur Strings können komprimiert werden - Uint8Array wird direkt zurückgegeben
   if (bodyToSend instanceof Uint8Array) {
     onDebug?.('not compressing binary response body');
     return { body: bodyToSend, headers: responseHeaders };
   }
-  
+
   // Return uncompressed if client doesn't support gzip or body is too small
   if (!supportsGzip || Buffer.byteLength(bodyToSend, 'utf8') <= minSizeBytes) {
     onDebug?.(

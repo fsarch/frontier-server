@@ -390,40 +390,25 @@ export class HttpProxyServer {
       const corsResponse = buildCorsResponse(corsPayload, route.cors);
       // endregion
 
-      // Create compression payload with CORS response
-      const compressionPayload = new PostHookPayload(
-        {
-          clientRequest: clientRequestData,
-          upstreamRequest: modifiedRequest,
-          response: corsResponse,
-        },
-        {
-          hookId: '$system.compression',
-          hookName: '$system.compression_processing',
-          functionId: '$system.build_in.compression',
-          routeId: route.pathRuleId,
-        },
-      );
-
-      // Start with CORS response headers (which already include upstream headers + CORS)
-      const responseHeaders = { ...corsResponse.headers };
-
-      // Since we've decoded the upstream response, remove content-encoding header
-      // (we'll recalculate it based on our response)
-      delete responseHeaders['content-encoding'];
-      delete responseHeaders['content-length'];
-      delete responseHeaders['transfer-encoding'];
-
-      const responseHeadersSimple: Record<string, string> = {};
-
-      // Apply modified headers from post-hooks if present (validate first)
-      if (corsResponse.headers) {
-        for (const [name, values] of Object.entries(corsResponse.headers)) {
-          if (typeof name === 'string' && /^[a-zA-Z0-9\-]+$/.test(name) && Array.isArray(values) && values.length > 0) {
-            responseHeadersSimple[name] = values.join(',');
-          }
-        }
-      }
+      // // Start with CORS response headers (which already include upstream headers + CORS)
+      // const responseHeaders = { ...corsResponse.headers };
+      //
+      // // Since we've decoded the upstream response, remove content-encoding header
+      // // (we'll recalculate it based on our response)
+      // delete responseHeaders['content-encoding'];
+      // delete responseHeaders['content-length'];
+      // delete responseHeaders['transfer-encoding'];
+      //
+      // const responseHeadersSimple: Record<string, string> = {};
+      //
+      // // Apply modified headers from post-hooks if present (validate first)
+      // if (corsResponse.headers) {
+      //   for (const [name, values] of Object.entries(corsResponse.headers)) {
+      //     if (typeof name === 'string' && /^[a-zA-Z0-9\-]+$/.test(name) && Array.isArray(values) && values.length > 0) {
+      //       responseHeadersSimple[name] = values.join(',');
+      //     }
+      //   }
+      // }
 
       this.debug(`upstream response status=${corsResponse.statusCode} upstream=${upstreamUrl}`);
 
@@ -433,6 +418,21 @@ export class HttpProxyServer {
       this.debug(`client accepts gzip: ${supportsGzip} (accept-encoding: ${acceptEncoding})`);
 
       if (corsResponse.body) {
+        // Create compression payload with CORS response
+        const compressionPayload = new PostHookPayload(
+          {
+            clientRequest: clientRequestData,
+            upstreamRequest: modifiedRequest,
+            response: corsResponse,
+          },
+          {
+            hookId: '$system.compression',
+            hookName: '$system.compression_processing',
+            functionId: '$system.build_in.compression',
+            routeId: route.pathRuleId,
+          },
+        );
+
         if (corsResponse.statusText) {
           res.statusMessage = corsResponse.statusText;
         }
@@ -443,13 +443,15 @@ export class HttpProxyServer {
           onDebug: (msg) => this.debug(msg),
         });
 
+        console.log(compressionResult.body, compressionResult.headers);
+
         res.writeHead(corsResponse.statusCode, compressionResult.headers);
         res.end(compressionResult.body);
       } else {
         if (corsResponse.statusText) {
           res.statusMessage = corsResponse.statusText;
         }
-        res.writeHead(corsResponse.statusCode, responseHeaders);
+        res.writeHead(corsResponse.statusCode, corsResponse.headers);
         res.end();
       }
 
@@ -791,8 +793,8 @@ function requestTypeToProxyRequest(request: RequestType): {
   const body = BodyUtils.plainObjectToBody(request.body);
 
   // For binary data, check byteLength; for string, check length
-  const hasBody = body instanceof Uint8Array 
-    ? body.byteLength > 0 
+  const hasBody = body instanceof Uint8Array
+    ? body.byteLength > 0
     : (body as string).length > 0;
 
   return {
