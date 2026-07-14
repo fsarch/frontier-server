@@ -1,5 +1,13 @@
-import { CorsPolicy, EntityMap, Hook, PathRule, WorkerConfigSnapshot } from '../types/worker-config.types.js';
+import { CachePolicy, CorsPolicy, EntityMap, Hook, PathRule, WorkerConfigSnapshot } from '../types/worker-config.types.js';
 import { FunctionConfigs, FunctionServerConfig, HookConfig } from './function-client.js';
+
+export type CompiledCachePolicy = {
+  enabled: boolean;
+  cachePolicyId: string | null;
+  minTTL: number;
+  maxTTL: number;
+  defaultTTL: number;
+};
 
 export type CompiledHookFunction = {
   id: string;
@@ -25,6 +33,7 @@ type CompiledRoute = {
   pathRuleId: string;
   pathPrefix: string;
   log: CompiledLogPolicy;
+  cachePolicy: CompiledCachePolicy;
   upstreams: CompiledUpstream[];
   cors: CompiledCorsPolicy;
   cursor: number;
@@ -53,6 +62,7 @@ export type RouteResolution = {
   pathRuleId: string;
   upstream: CompiledUpstream;
   pathPrefix: string;
+  cachePolicy: CompiledCachePolicy;
   cors: {
     enabled: boolean;
     allowCredentials: boolean;
@@ -131,6 +141,7 @@ export class CompiledWorkerConfig {
         pathRuleId: route.pathRuleId,
         upstream,
         pathPrefix: route.pathPrefix,
+        cachePolicy: route.cachePolicy,
         cors: {
           enabled: route.cors.enabled,
           allowCredentials: route.cors.allowCredentials,
@@ -231,6 +242,7 @@ export class CompiledWorkerConfig {
           pathRuleId: rule.id,
           pathPrefix: pathPattern,
           log: compileLogPolicy(rule.logPolicyId ? this.snapshot.logPolicies.entities[rule.logPolicyId] : undefined),
+          cachePolicy: compileCachePolicy(rule.cachePolicyId ? this.snapshot.cachePolicies.entities[rule.cachePolicyId] : undefined),
           upstreams,
           cors: compileCorsPolicy(rule.corsPolicyId ? this.snapshot.corsPolicies.entities[rule.corsPolicyId] : undefined),
           preHooks: compileHooks(rule.preHookId, this.snapshot.hooks ?? ({} as EntityMap<Hook>), this.functionServerConfigs),
@@ -413,6 +425,19 @@ function compileLogPolicy(policy: WorkerConfigSnapshot['logPolicies']['entities'
     enabled: policy?.enabled === true,
     logPolicyId: policy?.id ?? null,
     retentionTimeSeconds: policy?.retentionTimeSeconds ?? 0,
+  };
+}
+
+function compileCachePolicy(policy: CachePolicy | undefined): CompiledCachePolicy {
+  // Cache ist standardmäßig aktiviert, wenn eine Policy existiert
+  const enabled = policy !== undefined;
+
+  return {
+    enabled,
+    cachePolicyId: policy?.id ?? null,
+    minTTL: policy?.minTTL ?? 0,
+    maxTTL: policy?.maxTTL ?? 0,
+    defaultTTL: policy?.defaultTTL ?? 0,
   };
 }
 

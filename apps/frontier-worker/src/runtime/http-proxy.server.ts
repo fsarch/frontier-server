@@ -18,6 +18,7 @@ import {
 import { HeadersUtils } from "../utils/http/index.js";
 import { PostHookPayload } from './models/post-hook-payload.js';
 import { buildCorsResponse, getOriginFromRequest, buildCorsHeadersForHttp } from './hooks/cors.hook.js';
+import { buildCacheResponse } from "./hooks/cache.hook.js";
 
 type Metrics = {
   startedAt: number;
@@ -360,7 +361,7 @@ export class HttpProxyServer {
       };
 
       // Execute post-hooks if available
-      const postHooksResponse = await executePostHooks(
+      let response = await executePostHooks(
         this.functionClient,
         route.postHooks,
         clientRequestData,
@@ -376,7 +377,7 @@ export class HttpProxyServer {
         {
           clientRequest: clientRequestData,
           upstreamRequest: modifiedRequest,
-          response: postHooksResponse,
+          response,
         },
         {
           hookId: '$system.cors',
@@ -387,43 +388,44 @@ export class HttpProxyServer {
       );
 
       // Build response with CORS headers
-      const corsResponse = buildCorsResponse(corsPayload, route.cors);
+      response = buildCorsResponse(corsPayload, route.cors);
       // endregion
 
-      // // Start with CORS response headers (which already include upstream headers + CORS)
-      // const responseHeaders = { ...corsResponse.headers };
-      //
-      // // Since we've decoded the upstream response, remove content-encoding header
-      // // (we'll recalculate it based on our response)
-      // delete responseHeaders['content-encoding'];
-      // delete responseHeaders['content-length'];
-      // delete responseHeaders['transfer-encoding'];
-      //
-      // const responseHeadersSimple: Record<string, string> = {};
-      //
-      // // Apply modified headers from post-hooks if present (validate first)
-      // if (corsResponse.headers) {
-      //   for (const [name, values] of Object.entries(corsResponse.headers)) {
-      //     if (typeof name === 'string' && /^[a-zA-Z0-9\-]+$/.test(name) && Array.isArray(values) && values.length > 0) {
-      //       responseHeadersSimple[name] = values.join(',');
-      //     }
-      //   }
-      // }
+      // region Update Request with Cache headers
+      // Erzeuge PostHookPayload für Cache-Processing
+      const cachePayload = new PostHookPayload(
+        {
+          clientRequest: clientRequestData,
+          upstreamRequest: modifiedRequest,
+          response,
+        },
+        {
+          hookId: '$system.cache',
+          hookName: '$system.cache_response',
+          functionId: '$system.build_in.cache',
+          routeId: route.pathRuleId,
+        },
+      );
 
-      this.debug(`upstream response status=${corsResponse.statusCode} upstream=${upstreamUrl}`);
+      // Build response with Cache headers
+      response = buildCacheResponse(cachePayload, route.cachePolicy);
+      console.log('response', response);
+      // endregion
+
+      this.debug(`upstream response status=${response.statusCode} upstream=${upstreamUrl}`);
 
       // Check if client accepts gzip encoding
       const acceptEncoding = getSingleHeaderValue(req.headers['accept-encoding']);
       const supportsGzip = acceptsEncoding(acceptEncoding, 'gzip');
       this.debug(`client accepts gzip: ${supportsGzip} (accept-encoding: ${acceptEncoding})`);
 
-      if (corsResponse.body) {
+      if (response.body) {
         // Create compression payload with CORS response
         const compressionPayload = new PostHookPayload(
           {
             clientRequest: clientRequestData,
             upstreamRequest: modifiedRequest,
-            response: corsResponse,
+            response: response,
           },
           {
             hookId: '$system.compression',
@@ -433,8 +435,8 @@ export class HttpProxyServer {
           },
         );
 
-        if (corsResponse.statusText) {
-          res.statusMessage = corsResponse.statusText;
+        if (response.statusText) {
+          res.statusMessage = response.statusText;
         }
 
         // Apply compression with the compression payload
@@ -445,13 +447,13 @@ export class HttpProxyServer {
 
         console.log(compressionResult.body, compressionResult.headers);
 
-        res.writeHead(corsResponse.statusCode, compressionResult.headers);
+        res.writeHead(response.statusCode, compressionResult.headers);
         res.end(compressionResult.body);
       } else {
-        if (corsResponse.statusText) {
-          res.statusMessage = corsResponse.statusText;
+        if (response.statusText) {
+          res.statusMessage = response.statusText;
         }
-        res.writeHead(corsResponse.statusCode, corsResponse.headers);
+        res.writeHead(response.statusCode, response.headers);
         res.end();
       }
 
@@ -462,7 +464,7 @@ export class HttpProxyServer {
         upstreamMethod: modifiedRequest.method,
         upstreamUrl,
         upstreamHeaders: requestTypeHeadersToRecord(modifiedRequest.headers),
-        responseStatusCode: corsResponse.statusCode,
+        responseStatusCode: response.statusCode,
         requestTimeMs: Date.now() - requestStartedAt,
       });
     } catch (error) {

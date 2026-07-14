@@ -32,6 +32,24 @@ export type CorsPolicy = {
   allowedOrigins?: string[];
 };
 
+export type CachePolicy = {
+  id: string;
+  domainGroupId: string;
+  name: string;
+  enableCacheTags: boolean;
+  cacheTagsHeader?: string;
+  divergenceHeaders?: string[];
+  divergenceCookies?: string[];
+  divergenceQueryParameters?: string[];
+  minTTL?: number;
+  maxTTL?: number;
+  defaultTTL?: number;
+  enableStaleWhileError: boolean;
+  staleWhileErrorTime?: number;
+  enableStaleWhileRevalidate: boolean;
+  staleWhileRevalidateTime?: number;
+};
+
 export type DomainGroup = {
   id: string;
   name: string;
@@ -67,7 +85,7 @@ export type UpstreamGroup = {
 export type WorkerConfigSnapshot = {
   domainGroups: EntityMap<DomainGroup>;
   domainGroupDomainsByDomain: EntityMap<DomainGroupDomain>;
-  cachePolicies: EntityMap<unknown>;
+  cachePolicies: EntityMap<CachePolicy>;
   corsPolicies: EntityMap<CorsPolicy>;
   logPolicies: EntityMap<LogPolicy>;
   upstreamGroups: EntityMap<UpstreamGroup>;
