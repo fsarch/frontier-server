@@ -413,7 +413,6 @@ export class HttpProxyServer {
 
       // Build response with Cache headers
       response = buildCacheResponse(cachePayload, route.cachePolicy);
-      console.log('response', response);
       // endregion
 
       this.debug(`upstream response status=${response.statusCode} upstream=${upstreamUrl}`);
@@ -826,7 +825,6 @@ async function fetchWithOptionalInsecureTls(
   options: RequestInit,
   insecureTls: boolean,
 ): Promise<Response> {
-  console.log('options', options);
   if (!insecureTls) {
     return fetch(url, options);
   }
