@@ -796,9 +796,9 @@ function requestTypeToProxyRequest(request: RequestType): {
   const body = BodyUtils.plainObjectToBody(request.body);
 
   // For binary data, check byteLength; for string, check length
-  const hasBody = body instanceof Uint8Array
+  const hasBody = body ? (body instanceof Uint8Array
     ? body.byteLength > 0
-    : (body as string).length > 0;
+    : body.length > 0) : null;
 
   return {
     method: request.method,
