@@ -5,5 +5,5 @@ export interface ResponseType {
     statusCode: number;
     statusText: string;
     headers: HeadersType;
-    body: BodyType;
+    body: BodyType | null;
 }

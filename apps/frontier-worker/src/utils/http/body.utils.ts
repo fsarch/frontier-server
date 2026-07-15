@@ -4,7 +4,12 @@ import type { BodyType } from "../../types/http/shared.type.js";
  * Converts a body (string or unknown) to a BodyType plain object
  * Assumes JSON body type by default
  */
-async function bodyToPlainObject(body: BodyInit | null | unknown): Promise<BodyType> {
+async function bodyToPlainObject(body: BodyInit | null | unknown): Promise<BodyType | null> {
+    // Handle null and undefined explicitly
+    if (body === null || body === undefined) {
+        return null;
+    }
+
     // Handle Uint8Array and ArrayBuffer for binary data
     if (body instanceof Uint8Array) {
         return {
@@ -81,7 +86,11 @@ async function bodyToPlainObject(body: BodyInit | null | unknown): Promise<BodyT
 /**
  * Converts a BodyType plain object to a string or Uint8Array body
  */
-function plainObjectToBody(bodyType: BodyType): string | Uint8Array {
+function plainObjectToBody(bodyType: BodyType | null): string | Uint8Array | null {
+    if (bodyType === null) {
+        return null;
+    }
+
     if (bodyType.type === 'text') {
         return bodyType.payload;
     }

@@ -50,7 +50,7 @@ describe('ResponseUtils', () => {
 
             expect(result.statusCode).toBe(204);
             expect(result.statusText).toBe('No Content');
-            expect(result.body.payload).toBeNull();
+            expect(result.body).toBeNull();
         });
 
         it('should handle Response with empty string body', async () => {

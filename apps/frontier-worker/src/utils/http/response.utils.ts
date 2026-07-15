@@ -33,6 +33,7 @@ function plainObjectToResponse(responseType: ResponseType): Response {
         headers,
     };
 
+    // body can be null, string, or Uint8Array - all are valid BodyInit types
     // Uint8Array is a valid BodyInit type (via BufferSource)
     return new Response(body as BodyInit || null, responseInit);
 }

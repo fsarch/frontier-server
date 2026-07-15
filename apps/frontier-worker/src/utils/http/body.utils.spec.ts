@@ -19,18 +19,16 @@ describe('BodyUtils', () => {
             expect(result.payload).toBe('plain text');
         });
 
-        it('should convert null body to BodyType', async () => {
+        it('should convert null body to null', async () => {
             const result = await BodyUtils.bodyToPlainObject(null);
             
-            expect(result.type).toBe('json');
-            expect(result.payload).toBeNull();
+            expect(result).toBeNull();
         });
 
-        it('should convert undefined body to BodyType', async () => {
+        it('should convert undefined body to null', async () => {
             const result = await BodyUtils.bodyToPlainObject(undefined);
             
-            expect(result.type).toBe('json');
-            expect(result.payload).toBeNull();
+            expect(result).toBeNull();
         });
 
         it('should convert empty string to BodyType', async () => {

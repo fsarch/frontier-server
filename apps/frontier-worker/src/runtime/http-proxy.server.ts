@@ -327,6 +327,7 @@ export class HttpProxyServer {
       // Read upstream response body as buffer (not text - in case it's compressed)
       let upstreamResponseBody: unknown;
       const responseBuffer = await upstreamRes.arrayBuffer();
+      const hasBody = responseBuffer.byteLength > 0;
 
       // If upstream response is gzip-compressed, decompress it first
       const upstreamContentEncoding = getSingleHeaderValue(upstreamRes.headers['content-encoding']);
@@ -349,6 +350,9 @@ export class HttpProxyServer {
         upstreamResponseBody = JSON.parse(bodyText);
       } catch {
         upstreamResponseBody = bodyText;
+      }
+      if (!hasBody) {
+        upstreamResponseBody = null;
       }
 
       // Prepare upstream response for hook processing

@@ -38,7 +38,7 @@ export type CompiledCachePolicy = {
 /**
  * ResponseType für HTTP Responses - verwendet den BodyType aus shared.type.ts
  */
-export type ResponseType<TBody extends BodyType = BodyType> = {
+export type ResponseType<TBody extends BodyType | null = BodyType | null> = {
   type: 'response';
   statusCode: number;
   statusText: string;
@@ -207,7 +207,7 @@ export function serializeCacheControl(directives: ParsedCacheControl): string {
  * @param cachePolicy - Die anzuwendende CachePolicy
  * @returns Response mit angepasstem Cache-Control Header
  */
-export function applyCachePolicyToResponse<TBody extends BodyType>(
+export function applyCachePolicyToResponse<TBody extends BodyType | null>(
   response: ResponseType<TBody>,
   cachePolicy: CompiledCachePolicy,
 ): ResponseType<TBody> {

@@ -17,6 +17,6 @@ export interface RequestType {
   method: string;
   url: RequestUrl;
   headers: HeadersType;
-  body: BodyType;
+  body: BodyType | null;
 }
 

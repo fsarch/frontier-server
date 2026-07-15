@@ -26,8 +26,7 @@ describe('RequestUtils', () => {
             // Headers keys are lowercase in HeadersType
             expect(result.headers['content-type']).toEqual(['application/json']);
             expect(result.headers['authorization']).toEqual(['Bearer token']);
-            expect(result.body.type).toBe('json');
-            expect(result.body.payload).toBeNull();
+            expect(result.body).toBeNull();
         });
 
         it('should convert Request to RequestType with POST method and body', async () => {
@@ -82,7 +81,7 @@ describe('RequestUtils', () => {
             });
             
             const result = await RequestUtils.requestToPlainObject(request);
-            expect(result.body.payload).toBeNull();
+            expect(result.body).toBeNull();
         });
     });
 
