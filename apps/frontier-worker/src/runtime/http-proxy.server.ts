@@ -826,6 +826,7 @@ async function fetchWithOptionalInsecureTls(
   options: RequestInit,
   insecureTls: boolean,
 ): Promise<Response> {
+  console.log('options', options);
   if (!insecureTls) {
     return fetch(url, options);
   }
