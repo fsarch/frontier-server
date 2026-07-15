@@ -481,13 +481,27 @@ function isHeadersType(value: unknown): value is ResponseType['headers'] {
 }
 
 function isBodyType(value: unknown): value is ResponseType['body'] {
-  return Boolean(
-    value
-    && typeof value === 'object'
-    && 'type' in value
-    && ((value as { type?: unknown }).type === 'json' || (value as { type?: unknown }).type === 'text' || (value as { type?: unknown }).type === 'binary.uint8array')
-    && 'payload' in value,
-  );
+  if (value === null) {
+    return true;
+  }
+
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  if (!('type' in value)) {
+    return false;
+  }
+
+  if (value.type !== 'json' && value.type !== 'text' && value.type !== 'binary.uint8array') {
+    return false;
+  }
+
+  if (!('payload' in value)) {
+    return false;
+  }
+
+  return true;
 }
 
 function normalizeStatusText(statusCode: number): string {
