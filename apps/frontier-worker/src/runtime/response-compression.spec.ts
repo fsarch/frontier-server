@@ -4,7 +4,7 @@ import type { RequestType } from '../types/http/request.type.js';
 import type { ResponseType } from '../types/http/response.type.js';
 
 /**
- * Hilfsfunktion zum Erstellen eines PostHookPayload für Tests
+ * Helper function to create a PostHookPayload for tests
  */
 function createTestPostHookPayload(bodyText: string, headers: Record<string, string>): PostHookPayload {
   const requestType: RequestType = {
@@ -29,7 +29,7 @@ function createTestPostHookPayload(bodyText: string, headers: Record<string, str
     body: { type: 'text', payload: bodyText },
   };
 
-  // Header Konvertierung: Record<string, string> -> Record<string, string[]>
+  // Header conversion: Record<string, string> -> Record<string, string[]>
   const responseHeaders: ResponseType['headers'] = {};
   for (const [key, value] of Object.entries(headers)) {
     responseHeaders[key] = [value];
@@ -78,6 +78,7 @@ describe('compressResponseBody', () => {
     it('should append to existing vary header without duplication', async () => {
       const bodyText = 'x'.repeat(200);
       const headers: Record<string, string> = {
+        'content-type': 'text/plain',
         'vary': 'Origin',
       };
 
@@ -108,6 +109,7 @@ describe('compressResponseBody', () => {
     it('should remove transfer-encoding header when compressing', async () => {
       const bodyText = 'x'.repeat(200);
       const headers: Record<string, string> = {
+        'content-type': 'text/plain',
         'transfer-encoding': 'chunked',
       };
 
@@ -123,7 +125,9 @@ describe('compressResponseBody', () => {
     it('should handle debug callback', async () => {
       const bodyText = 'x'.repeat(200);
       const debugMessages: string[] = [];
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = {
+        'content-type': 'text/plain',
+      };
 
       const hookPayload = createTestPostHookPayload(bodyText, headers);
       await compressResponseBody(hookPayload, {
@@ -189,7 +193,9 @@ describe('compressResponseBody', () => {
 
     it('should respect custom minimum size threshold', async () => {
       const bodyText = 'x'.repeat(50);
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = {
+        'content-type': 'text/plain',
+      };
 
       const hookPayload = createTestPostHookPayload(bodyText, headers);
       const result = await compressResponseBody(hookPayload, {
@@ -218,7 +224,9 @@ describe('compressResponseBody', () => {
 
     it('should compress if body is 1 byte above minimum size', async () => {
       const bodyText = 'x'.repeat(101);
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = {
+        'content-type': 'text/plain',
+      };
 
       const hookPayload = createTestPostHookPayload(bodyText, headers);
       const result = await compressResponseBody(hookPayload, {
@@ -235,7 +243,9 @@ describe('compressResponseBody', () => {
     it('should calculate byte length correctly for multi-byte UTF-8 characters', async () => {
       // "你好" is 2 chars but 6 bytes in UTF-8
       const bodyText = '你好'.repeat(50); // 100 chars, 300 bytes
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = {
+        'content-type': 'text/plain',
+      };
 
       const hookPayload = createTestPostHookPayload(bodyText, headers);
       const result = await compressResponseBody(hookPayload, {
@@ -268,7 +278,9 @@ describe('compressResponseBody', () => {
   describe('default minSizeBytes', () => {
     it('should use 100 bytes as default minimum size', async () => {
       const bodyText = 'x'.repeat(99);
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = {
+        'content-type': 'text/plain',
+      };
 
       const hookPayload = createTestPostHookPayload(bodyText, headers);
       const result = await compressResponseBody(hookPayload, {
@@ -281,7 +293,9 @@ describe('compressResponseBody', () => {
 
     it('should compress body with default minimum when body > 100 bytes', async () => {
       const bodyText = 'x'.repeat(101);
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = {
+        'content-type': 'text/plain',
+      };
 
       const hookPayload = createTestPostHookPayload(bodyText, headers);
       const result = await compressResponseBody(hookPayload, {
@@ -314,6 +328,7 @@ describe('compressResponseBody', () => {
     it('should update content-length header for compressed response', async () => {
       const bodyText = 'x'.repeat(200);
       const headers: Record<string, string> = {
+        'content-type': 'text/plain',
         'content-length': '200',
       };
 
@@ -331,7 +346,9 @@ describe('compressResponseBody', () => {
   describe('error handling', () => {
     it('should fall back to uncompressed on compression error', async () => {
       const bodyText = 'x'.repeat(200);
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = {
+        'content-type': 'text/plain',
+      };
 
       // Note: actual gzip compression failures are rare in Node.js,
       // but we test the error handling path anyway
@@ -355,7 +372,9 @@ describe('compressResponseBody', () => {
       const bodyText = 'x'.repeat(200);
       const debugMessages: string[] = [];
 
-      const hookPayload = createTestPostHookPayload(bodyText, {});
+      const hookPayload = createTestPostHookPayload(bodyText, {
+        'content-type': 'text/plain',
+      });
       await compressResponseBody(hookPayload, {
         supportsGzip: true,
         minSizeBytes: 100,
@@ -435,6 +454,248 @@ describe('compressResponseBody', () => {
       expect(result.body).toBeInstanceOf(Buffer);
       expect((result.body as Buffer).length).toBeLessThan(htmlPayload.length);
       expect(result.headers['content-encoding']).toBe('gzip');
+    });
+  });
+
+  describe('content-type allowlist', () => {
+    it('should compress text/plain content-type', async () => {
+      const bodyText = 'x'.repeat(200);
+      const headers: Record<string, string> = {
+        'content-type': 'text/plain',
+      };
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.body).toBeInstanceOf(Buffer);
+      expect(result.headers['content-encoding']).toBe('gzip');
+    });
+
+    it('should compress application/json content-type', async () => {
+      const bodyText = 'x'.repeat(200);
+      const headers: Record<string, string> = {
+        'content-type': 'application/json',
+      };
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.body).toBeInstanceOf(Buffer);
+      expect(result.headers['content-encoding']).toBe('gzip');
+    });
+
+    it('should NOT compress image/png content-type', async () => {
+      const bodyText = 'x'.repeat(200);
+      const headers: Record<string, string> = {
+        'content-type': 'image/png',
+      };
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.body).toBe(bodyText);
+      expect(result.headers['content-encoding']).toBeUndefined();
+    });
+
+    it('should NOT compress image/jpeg content-type', async () => {
+      const bodyText = 'x'.repeat(200);
+      const headers: Record<string, string> = {
+        'content-type': 'image/jpeg',
+      };
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.body).toBe(bodyText);
+      expect(result.headers['content-encoding']).toBeUndefined();
+    });
+
+    it('should NOT compress application/gzip content-type', async () => {
+      const bodyText = 'x'.repeat(200);
+      const headers: Record<string, string> = {
+        'content-type': 'application/gzip',
+      };
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.body).toBe(bodyText);
+      expect(result.headers['content-encoding']).toBeUndefined();
+    });
+
+    it('should NOT compress application/octet-stream content-type', async () => {
+      const bodyText = 'x'.repeat(200);
+      const headers: Record<string, string> = {
+        'content-type': 'application/octet-stream',
+      };
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.body).toBe(bodyText);
+      expect(result.headers['content-encoding']).toBeUndefined();
+    });
+
+    it('should NOT compress video/mp4 content-type', async () => {
+      const bodyText = 'x'.repeat(200);
+      const headers: Record<string, string> = {
+        'content-type': 'video/mp4',
+      };
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.body).toBe(bodyText);
+      expect(result.headers['content-encoding']).toBeUndefined();
+    });
+
+    it('should NOT compress application/zip content-type', async () => {
+      const bodyText = 'x'.repeat(200);
+      const headers: Record<string, string> = {
+        'content-type': 'application/zip',
+      };
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.body).toBe(bodyText);
+      expect(result.headers['content-encoding']).toBeUndefined();
+    });
+
+    it('should compress content-type with charset parameter', async () => {
+      const bodyText = 'x'.repeat(200);
+      const headers: Record<string, string> = {
+        'content-type': 'text/html; charset=utf-8',
+      };
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.body).toBeInstanceOf(Buffer);
+      expect(result.headers['content-encoding']).toBe('gzip');
+    });
+
+    it('should NOT compress when content-type is missing', async () => {
+      const bodyText = 'x'.repeat(200);
+      const headers: Record<string, string> = {};
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.body).toBe(bodyText);
+      expect(result.headers['content-encoding']).toBeUndefined();
+    });
+
+    it('should compress text/css content-type', async () => {
+      const bodyText = 'x'.repeat(200);
+      const headers: Record<string, string> = {
+        'content-type': 'text/css',
+      };
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.body).toBeInstanceOf(Buffer);
+      expect(result.headers['content-encoding']).toBe('gzip');
+    });
+
+    it('should compress application/xml content-type', async () => {
+      const bodyText = 'x'.repeat(200);
+      const headers: Record<string, string> = {
+        'content-type': 'application/xml',
+      };
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.body).toBeInstanceOf(Buffer);
+      expect(result.headers['content-encoding']).toBe('gzip');
+    });
+
+    it('should compress text/javascript content-type', async () => {
+      const bodyText = 'x'.repeat(200);
+      const headers: Record<string, string> = {
+        'content-type': 'text/javascript',
+      };
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.body).toBeInstanceOf(Buffer);
+      expect(result.headers['content-encoding']).toBe('gzip');
+    });
+
+    it('should NOT compress font/woff2 content-type', async () => {
+      const bodyText = 'x'.repeat(200);
+      const headers: Record<string, string> = {
+        'content-type': 'font/woff2',
+      };
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.body).toBe(bodyText);
+      expect(result.headers['content-encoding']).toBeUndefined();
+    });
+
+    it('should log debug message about content-type and compressibility', async () => {
+      const bodyText = 'x'.repeat(200);
+      const debugMessages: string[] = [];
+      const headers: Record<string, string> = {
+        'content-type': 'text/html; charset=utf-8',
+      };
+
+      const hookPayload = createTestPostHookPayload(bodyText, headers);
+      await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+        onDebug: (msg) => debugMessages.push(msg),
+      });
+
+      expect(debugMessages.some((msg) => msg.includes('content-type: text/html'))).toBe(true);
+      expect(debugMessages.some((msg) => msg.includes('compressible: true'))).toBe(true);
     });
   });
 });
