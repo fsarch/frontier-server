@@ -349,7 +349,7 @@ export class HttpProxyServer {
       try {
         upstreamResponseBody = JSON.parse(bodyText);
       } catch {
-        upstreamResponseBody = bodyText;
+        upstreamResponseBody = bodyBuffer;
       }
       if (!hasBody) {
         upstreamResponseBody = null;
