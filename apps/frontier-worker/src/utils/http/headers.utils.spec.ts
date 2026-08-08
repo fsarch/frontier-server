@@ -31,6 +31,29 @@ describe('HeadersUtils', () => {
             const result = HeadersUtils.headersToPlainObject(headers);
             expect(Object.keys(result)).toHaveLength(0);
         });
+
+        it('should keep multiple Set-Cookie headers as separate values, not comma-joined', () => {
+            const headers = new Headers();
+            headers.append('Set-Cookie', 'a=1');
+            headers.append('Set-Cookie', 'b=2');
+
+            const result = HeadersUtils.headersToPlainObject(headers);
+
+            expect(result['set-cookie']).toEqual(['a=1', 'b=2']);
+        });
+
+        it('should not split a Set-Cookie value on a comma inside its own content (e.g. an Expires date)', () => {
+            const headers = new Headers();
+            headers.append('Set-Cookie', 'session=abc; Expires=Wed, 21 Oct 2015 07:28:00 GMT');
+            headers.append('Set-Cookie', 'other=xyz');
+
+            const result = HeadersUtils.headersToPlainObject(headers);
+
+            expect(result['set-cookie']).toEqual([
+                'session=abc; Expires=Wed, 21 Oct 2015 07:28:00 GMT',
+                'other=xyz',
+            ]);
+        });
     });
 
     describe('plainObjectToHeaders', () => {

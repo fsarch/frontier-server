@@ -1,5 +1,6 @@
 import { compressResponseBody } from './hooks/compression.hook.js';
 import { PostHookPayload } from './models/post-hook-payload.js';
+import { BodyUtils } from '../utils/http/body.utils.js';
 import type { RequestType } from '../types/http/request.type.js';
 import type { ResponseType } from '../types/http/response.type.js';
 
@@ -46,6 +47,16 @@ function createTestPostHookPayload(bodyText: string, headers: Record<string, str
   );
 }
 
+/** Reads the first value of a (possibly absent) response header. */
+function headerValue(result: ResponseType, name: string): string | undefined {
+  return result.headers[name]?.[0];
+}
+
+/** Materializes the ResponseType body back into raw bytes/text, like the proxy does before writing the response. */
+function rawBody(result: ResponseType): string | Uint8Array | null {
+  return BodyUtils.plainObjectToBody(result.body);
+}
+
 describe('compressResponseBody', () => {
   describe('when gzip is supported and body is large enough', () => {
     it('should compress the body and set appropriate headers', async () => {
@@ -60,19 +71,21 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      // Should return compressed buffer
-      expect(result.body).toBeInstanceOf(Buffer);
-      expect((result.body as Buffer).length).toBeLessThan(bodyText.length);
+      // Should return a binary body, smaller than the original text
+      expect(result.body?.type).toBe('binary.uint8array');
+      const compressedBody = rawBody(result);
+      expect(compressedBody).toBeInstanceOf(Uint8Array);
+      expect((compressedBody as Uint8Array).byteLength).toBeLessThan(bodyText.length);
 
       // Should update headers
-      expect(result.headers['content-encoding']).toBe('gzip');
-      expect(result.headers['content-type']).toBe('text/plain');
-      expect(result.headers['content-length']).toBeDefined();
-      expect(parseInt(result.headers['content-length'], 10)).toBe((result.body as Buffer).length);
-      expect(result.headers['transfer-encoding']).toBeUndefined();
+      expect(headerValue(result, 'content-encoding')).toBe('gzip');
+      expect(headerValue(result, 'content-type')).toBe('text/plain');
+      expect(headerValue(result, 'content-length')).toBeDefined();
+      expect(parseInt(headerValue(result, 'content-length')!, 10)).toBe((compressedBody as Uint8Array).byteLength);
+      expect(headerValue(result, 'transfer-encoding')).toBeUndefined();
 
       // Should add vary header
-      expect(result.headers['vary']).toContain('Accept-Encoding');
+      expect(headerValue(result, 'vary')).toContain('Accept-Encoding');
     });
 
     it('should append to existing vary header without duplication', async () => {
@@ -88,7 +101,7 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.headers['vary']).toBe('Origin, Accept-Encoding');
+      expect(headerValue(result, 'vary')).toBe('Origin, Accept-Encoding');
     });
 
     it('should not duplicate Accept-Encoding in vary header if already present', async () => {
@@ -103,7 +116,7 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.headers['vary']).toBe('Origin, Accept-Encoding');
+      expect(headerValue(result, 'vary')).toBe('Origin, Accept-Encoding');
     });
 
     it('should remove transfer-encoding header when compressing', async () => {
@@ -119,7 +132,7 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.headers['transfer-encoding']).toBeUndefined();
+      expect(headerValue(result, 'transfer-encoding')).toBeUndefined();
     });
 
     it('should handle debug callback', async () => {
@@ -155,9 +168,9 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBe(bodyText);
-      expect(result.headers['content-encoding']).toBeUndefined();
-      expect(result.headers['content-length']).toEqual('200');
+      expect(rawBody(result)).toBe(bodyText);
+      expect(headerValue(result, 'content-encoding')).toBeUndefined();
+      expect(headerValue(result, 'content-length')).toEqual('200');
     });
 
     it('should log debug message when not compressing', async () => {
@@ -187,8 +200,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBe(bodyText);
-      expect(result.headers['content-encoding']).toBeUndefined();
+      expect(rawBody(result)).toBe(bodyText);
+      expect(headerValue(result, 'content-encoding')).toBeUndefined();
     });
 
     it('should respect custom minimum size threshold', async () => {
@@ -203,8 +216,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBe(bodyText);
-      expect(result.headers['content-encoding']).toBeUndefined();
+      expect(rawBody(result)).toBe(bodyText);
+      expect(headerValue(result, 'content-encoding')).toBeUndefined();
     });
 
     it('should compress if body exactly equals minimum size', async () => {
@@ -218,8 +231,8 @@ describe('compressResponseBody', () => {
       });
 
       // Should still be uncompressed since it needs to be > minSizeBytes, not >=
-      expect(result.body).toBe(bodyText);
-      expect(result.headers['content-encoding']).toBeUndefined();
+      expect(rawBody(result)).toBe(bodyText);
+      expect(headerValue(result, 'content-encoding')).toBeUndefined();
     });
 
     it('should compress if body is 1 byte above minimum size', async () => {
@@ -234,8 +247,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBeInstanceOf(Buffer);
-      expect(result.headers['content-encoding']).toBe('gzip');
+      expect(rawBody(result)).toBeInstanceOf(Uint8Array);
+      expect(headerValue(result, 'content-encoding')).toBe('gzip');
     });
   });
 
@@ -254,8 +267,8 @@ describe('compressResponseBody', () => {
       });
 
       // Should compress because byte length is > 100
-      expect(result.headers['content-encoding']).toBe('gzip');
-      expect(result.body).toBeInstanceOf(Buffer);
+      expect(headerValue(result, 'content-encoding')).toBe('gzip');
+      expect(rawBody(result)).toBeInstanceOf(Uint8Array);
     });
   });
 
@@ -270,8 +283,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBe('');
-      expect(result.headers['content-encoding']).toBeUndefined();
+      expect(rawBody(result)).toBe('');
+      expect(headerValue(result, 'content-encoding')).toBeUndefined();
     });
   });
 
@@ -287,8 +300,8 @@ describe('compressResponseBody', () => {
         supportsGzip: true,
       });
 
-      expect(result.body).toBe(bodyText);
-      expect(result.headers['content-encoding']).toBeUndefined();
+      expect(rawBody(result)).toBe(bodyText);
+      expect(headerValue(result, 'content-encoding')).toBeUndefined();
     });
 
     it('should compress body with default minimum when body > 100 bytes', async () => {
@@ -302,7 +315,7 @@ describe('compressResponseBody', () => {
         supportsGzip: true,
       });
 
-      expect(result.headers['content-encoding']).toBe('gzip');
+      expect(headerValue(result, 'content-encoding')).toBe('gzip');
     });
   });
 
@@ -320,9 +333,9 @@ describe('compressResponseBody', () => {
         supportsGzip: true,
       });
 
-      expect(result.headers['content-type']).toBe('application/json');
-      expect(result.headers['cache-control']).toBe('max-age=3600');
-      expect(result.headers['x-custom-header']).toBe('value');
+      expect(headerValue(result, 'content-type')).toBe('application/json');
+      expect(headerValue(result, 'cache-control')).toBe('max-age=3600');
+      expect(headerValue(result, 'x-custom-header')).toBe('value');
     });
 
     it('should update content-length header for compressed response', async () => {
@@ -337,9 +350,32 @@ describe('compressResponseBody', () => {
         supportsGzip: true,
       });
 
-      const compressedLength = parseInt(result.headers['content-length'], 10);
+      const compressedBody = rawBody(result) as Uint8Array;
+      const compressedLength = parseInt(headerValue(result, 'content-length')!, 10);
       expect(compressedLength).toBeLessThan(200);
-      expect(compressedLength).toBe((result.body as Buffer).length);
+      expect(compressedLength).toBe(compressedBody.byteLength);
+    });
+
+    it('should preserve multiple Set-Cookie headers without merging or splitting them', async () => {
+      const bodyText = 'x'.repeat(200);
+      const hookPayload = createTestPostHookPayload(bodyText, {
+        'content-type': 'text/plain',
+      });
+      // Simulate multiple Set-Cookie headers, one of them containing a comma (Expires date)
+      hookPayload.payload.response.headers['set-cookie'] = [
+        'session=abc; Expires=Wed, 21 Oct 2015 07:28:00 GMT',
+        'other=xyz',
+      ];
+
+      const result = await compressResponseBody(hookPayload, {
+        supportsGzip: true,
+        minSizeBytes: 100,
+      });
+
+      expect(result.headers['set-cookie']).toEqual([
+        'session=abc; Expires=Wed, 21 Oct 2015 07:28:00 GMT',
+        'other=xyz',
+      ]);
     });
   });
 
@@ -360,11 +396,12 @@ describe('compressResponseBody', () => {
 
       // In normal operation, this should succeed
       expect(result.body).toBeDefined();
-      if (typeof result.body === 'string') {
-        expect(result.body).toBe(bodyText);
+      const body = rawBody(result);
+      if (typeof body === 'string') {
+        expect(body).toBe(bodyText);
       } else {
-        expect(result.body).toBeInstanceOf(Buffer);
-        expect(result.headers['content-encoding']).toBe('gzip');
+        expect(body).toBeInstanceOf(Uint8Array);
+        expect(headerValue(result, 'content-encoding')).toBe('gzip');
       }
     });
 
@@ -413,10 +450,11 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBeInstanceOf(Buffer);
-      expect((result.body as Buffer).length).toBeLessThan(jsonPayload.length);
-      expect(result.headers['content-encoding']).toBe('gzip');
-      expect(result.headers['content-type']).toBe('application/json');
+      const compressedBody = rawBody(result) as Uint8Array;
+      expect(compressedBody).toBeInstanceOf(Uint8Array);
+      expect(compressedBody.byteLength).toBeLessThan(jsonPayload.length);
+      expect(headerValue(result, 'content-encoding')).toBe('gzip');
+      expect(headerValue(result, 'content-type')).toBe('application/json');
     });
   });
 
@@ -451,9 +489,10 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBeInstanceOf(Buffer);
-      expect((result.body as Buffer).length).toBeLessThan(htmlPayload.length);
-      expect(result.headers['content-encoding']).toBe('gzip');
+      const compressedBody = rawBody(result) as Uint8Array;
+      expect(compressedBody).toBeInstanceOf(Uint8Array);
+      expect(compressedBody.byteLength).toBeLessThan(htmlPayload.length);
+      expect(headerValue(result, 'content-encoding')).toBe('gzip');
     });
   });
 
@@ -470,8 +509,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBeInstanceOf(Buffer);
-      expect(result.headers['content-encoding']).toBe('gzip');
+      expect(rawBody(result)).toBeInstanceOf(Uint8Array);
+      expect(headerValue(result, 'content-encoding')).toBe('gzip');
     });
 
     it('should compress application/json content-type', async () => {
@@ -486,8 +525,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBeInstanceOf(Buffer);
-      expect(result.headers['content-encoding']).toBe('gzip');
+      expect(rawBody(result)).toBeInstanceOf(Uint8Array);
+      expect(headerValue(result, 'content-encoding')).toBe('gzip');
     });
 
     it('should NOT compress image/png content-type', async () => {
@@ -502,8 +541,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBe(bodyText);
-      expect(result.headers['content-encoding']).toBeUndefined();
+      expect(rawBody(result)).toBe(bodyText);
+      expect(headerValue(result, 'content-encoding')).toBeUndefined();
     });
 
     it('should NOT compress image/jpeg content-type', async () => {
@@ -518,8 +557,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBe(bodyText);
-      expect(result.headers['content-encoding']).toBeUndefined();
+      expect(rawBody(result)).toBe(bodyText);
+      expect(headerValue(result, 'content-encoding')).toBeUndefined();
     });
 
     it('should NOT compress application/gzip content-type', async () => {
@@ -534,8 +573,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBe(bodyText);
-      expect(result.headers['content-encoding']).toBeUndefined();
+      expect(rawBody(result)).toBe(bodyText);
+      expect(headerValue(result, 'content-encoding')).toBeUndefined();
     });
 
     it('should NOT compress application/octet-stream content-type', async () => {
@@ -550,8 +589,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBe(bodyText);
-      expect(result.headers['content-encoding']).toBeUndefined();
+      expect(rawBody(result)).toBe(bodyText);
+      expect(headerValue(result, 'content-encoding')).toBeUndefined();
     });
 
     it('should NOT compress video/mp4 content-type', async () => {
@@ -566,8 +605,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBe(bodyText);
-      expect(result.headers['content-encoding']).toBeUndefined();
+      expect(rawBody(result)).toBe(bodyText);
+      expect(headerValue(result, 'content-encoding')).toBeUndefined();
     });
 
     it('should NOT compress application/zip content-type', async () => {
@@ -582,8 +621,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBe(bodyText);
-      expect(result.headers['content-encoding']).toBeUndefined();
+      expect(rawBody(result)).toBe(bodyText);
+      expect(headerValue(result, 'content-encoding')).toBeUndefined();
     });
 
     it('should compress content-type with charset parameter', async () => {
@@ -598,8 +637,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBeInstanceOf(Buffer);
-      expect(result.headers['content-encoding']).toBe('gzip');
+      expect(rawBody(result)).toBeInstanceOf(Uint8Array);
+      expect(headerValue(result, 'content-encoding')).toBe('gzip');
     });
 
     it('should NOT compress when content-type is missing', async () => {
@@ -612,8 +651,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBe(bodyText);
-      expect(result.headers['content-encoding']).toBeUndefined();
+      expect(rawBody(result)).toBe(bodyText);
+      expect(headerValue(result, 'content-encoding')).toBeUndefined();
     });
 
     it('should compress text/css content-type', async () => {
@@ -628,8 +667,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBeInstanceOf(Buffer);
-      expect(result.headers['content-encoding']).toBe('gzip');
+      expect(rawBody(result)).toBeInstanceOf(Uint8Array);
+      expect(headerValue(result, 'content-encoding')).toBe('gzip');
     });
 
     it('should compress application/xml content-type', async () => {
@@ -644,8 +683,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBeInstanceOf(Buffer);
-      expect(result.headers['content-encoding']).toBe('gzip');
+      expect(rawBody(result)).toBeInstanceOf(Uint8Array);
+      expect(headerValue(result, 'content-encoding')).toBe('gzip');
     });
 
     it('should compress text/javascript content-type', async () => {
@@ -660,8 +699,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBeInstanceOf(Buffer);
-      expect(result.headers['content-encoding']).toBe('gzip');
+      expect(rawBody(result)).toBeInstanceOf(Uint8Array);
+      expect(headerValue(result, 'content-encoding')).toBe('gzip');
     });
 
     it('should NOT compress font/woff2 content-type', async () => {
@@ -676,8 +715,8 @@ describe('compressResponseBody', () => {
         minSizeBytes: 100,
       });
 
-      expect(result.body).toBe(bodyText);
-      expect(result.headers['content-encoding']).toBeUndefined();
+      expect(rawBody(result)).toBe(bodyText);
+      expect(headerValue(result, 'content-encoding')).toBeUndefined();
     });
 
     it('should log debug message about content-type and compressibility', async () => {

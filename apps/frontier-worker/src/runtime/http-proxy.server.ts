@@ -443,13 +443,13 @@ export class HttpProxyServer {
         }
 
         // Apply compression with the compression payload
-        const compressionResult = await compressResponseBody(compressionPayload, {
+        const compressedResponse = await compressResponseBody(compressionPayload, {
           supportsGzip,
           onDebug: (msg) => this.debug(msg),
         });
 
-        res.writeHead(response.statusCode, compressionResult.headers);
-        res.end(compressionResult.body);
+        res.writeHead(compressedResponse.statusCode, compressedResponse.headers);
+        res.end(BodyUtils.plainObjectToBody(compressedResponse.body) ?? undefined);
       } else {
         if (response.statusText) {
           res.statusMessage = response.statusText;
