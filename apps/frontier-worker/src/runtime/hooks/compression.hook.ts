@@ -78,9 +78,14 @@ export async function compressResponseBody(
   const bodyToSend = BodyUtils.plainObjectToBody(response.body);
   const headers = { ...response.headers };
 
+  // The body is fully materialized by this point (in memory), so its length is always known -
+  // set an explicit content-length and drop any transfer-encoding/content-encoding inherited from
+  // the upstream response. Sending both content-length and transfer-encoding is a protocol
+  // violation that clients/parsers will reject.
   const rawSize = bodyToSend === null ? 0 : Buffer.byteLength(bodyToSend, 'utf8');
   headers['content-length'] = [rawSize.toString()];
   delete headers['content-encoding'];
+  delete headers['transfer-encoding'];
 
   // Only strings can be compressed - binary/empty bodies are passed through as-is
   if (bodyToSend === null || bodyToSend instanceof Uint8Array) {
@@ -109,7 +114,6 @@ export async function compressResponseBody(
     // Update headers for gzip response
     headers['content-encoding'] = ['gzip'];
     headers['content-length'] = [compressed.length.toString()];
-    delete headers['transfer-encoding'];
 
     // Update vary header
     const vary = getHeaderValue(headers, 'vary');

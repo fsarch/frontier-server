@@ -8,6 +8,7 @@ import { buildUpstreamPath, CompiledWorkerConfig } from './compiled-config.js';
 import { WorkerConfigSnapshot } from '../types/worker-config.types.js';
 import type { RequestType } from '../types/http/request.type.js';
 import type { ResponseType } from '../types/http/response.type.js';
+import type { BodyType } from '../types/http/shared.type.js';
 import { FunctionClient, FunctionServerConfig } from './function-client.js';
 import { BodyUtils } from '../utils/http/body.utils.js';
 import { compressResponseBody } from './hooks/compression.hook.js';
@@ -239,12 +240,26 @@ export class HttpProxyServer {
       this.debug(`resolved request host=${hostHeader ?? '<missing>'} path=${requestUrl.pathname} routePrefix=${route.pathPrefix} upstream=${upstreamUrl}`);
       this.debug(`upstream request method=${method} url=${upstreamUrl}`);
 
-      // Read the request body for hook processing
-      const requestBody = method === 'GET' || method === 'HEAD' ? undefined : await this.readRequestBody(req);
+      // Only buffer the request body up-front when a pre-hook is actually going to run on this
+      // route - pre-hooks need the full body (as a Uint8Array) to inspect/transform it. Otherwise
+      // the body is streamed straight through to the upstream further down (see upstreamFetchOptions),
+      // which avoids holding large uploads (e.g. file uploads) fully in memory before forwarding
+      // a single byte.
+      const skipBody = method === 'GET' || method === 'HEAD';
+      const preHooksActive = route.preHooks.enabled && this.functionClient !== null && !skipBody;
+      const requestBodyBytes = preHooksActive ? await this.readRequestBody(req) : undefined;
+
+      // Interpret the buffered bytes based on the declared Content-Type: JSON stays a parsed
+      // object (type: 'json'), text/* stays a decoded string (type: 'text'), everything else -
+      // including any content whose declared type turns out to be a lie - is handed to the hook
+      // as raw bytes (type: 'binary.uint8array') instead of being guessed at.
+      const requestBodyForHooks = preHooksActive
+        ? decodeRequestBodyForHooks(requestBodyBytes, req.headers['content-type'])
+        : null;
 
       // Prepare hook request data
-      const clientRequestData = await buildRequestType(method, incomingUrl, req.headers, requestBody, true);
-      const hookRequestData = await buildRequestType(method, upstreamUrl, upstreamHeaders, requestBody, false);
+      const clientRequestData = buildRequestType(method, incomingUrl, req.headers, requestBodyForHooks, true);
+      const hookRequestData = buildRequestType(method, upstreamUrl, upstreamHeaders, requestBodyForHooks, false);
 
       // Execute pre-hooks if available
       const preHookResult = await executePreHooks(
@@ -311,9 +326,21 @@ export class HttpProxyServer {
       const upstreamFetchOptions: RequestInit = {
         method: upstreamRequestOptions.method,
         headers: upstreamRequestOptions.headers,
-        body: upstreamRequestOptions.body,
         redirect: 'manual',
       };
+
+      if (skipBody) {
+        // GET/HEAD never carry a body.
+      } else if (preHooksActive) {
+        // Body was buffered (and possibly rewritten) for the pre-hook - send the materialized bytes.
+        upstreamFetchOptions.body = upstreamRequestOptions.body;
+      } else {
+        // No pre-hook touched the body - stream the client's request straight through to the
+        // upstream instead of buffering it in memory first.
+        upstreamFetchOptions.body = req;
+        upstreamFetchOptions.duplex = 'half';
+      }
+
       if (route.upstream.protocol === 'https' && route.upstream.sslVerify === false) {
         this.debug(`ssl verification disabled for upstream ${route.upstream.host}:${route.upstream.port}`);
       }
@@ -528,7 +555,12 @@ export class HttpProxyServer {
     console.debug(`[worker][proxy] ${message}`);
   }
 
-  private async readRequestBody(req: IncomingMessage): Promise<unknown> {
+  /**
+   * Buffers the full request body into a single Uint8Array. Only called when a pre-hook is
+   * enabled for the route and therefore needs to inspect/transform the complete body - the
+   * default request path streams the body straight through to the upstream without calling this.
+   */
+  private async readRequestBody(req: IncomingMessage): Promise<Uint8Array | undefined> {
     return new Promise((resolve, reject) => {
       const chunks: Uint8Array[] = [];
 
@@ -537,23 +569,8 @@ export class HttpProxyServer {
       });
 
       req.on('end', () => {
-        try {
-          const body = Buffer.concat(chunks);
-          if (body.length === 0) {
-            resolve(undefined);
-            return;
-          }
-
-          // Try to parse as JSON, fall back to raw string
-          try {
-            const parsed = JSON.parse(body.toString('utf-8'));
-            resolve(parsed);
-          } catch {
-            resolve(body.toString('utf-8'));
-          }
-        } catch (error) {
-          reject(error);
-        }
+        const body = Buffer.concat(chunks);
+        resolve(body.length === 0 ? undefined : body);
       });
 
       req.on('error', (error) => {
@@ -716,13 +733,13 @@ function getFirstCommaSeparatedValue(value: string | undefined): string | undefi
   return first?.length ? first : undefined;
 }
 
-async function buildRequestType(
+function buildRequestType(
   method: string,
   urlString: string,
   headers: IncomingHttpHeaders | Record<string, string>,
-  body: unknown,
+  body: BodyType | null,
   includeHost: boolean,
-): Promise<RequestType> {
+): RequestType {
   const url = new URL(urlString);
   const query: RequestType['url']['query'] = {};
 
@@ -773,8 +790,50 @@ async function buildRequestType(
       query,
     },
     headers: requestHeaders,
-    body: await BodyUtils.bodyToPlainObject(body ?? null),
+    body,
   };
+}
+
+/**
+ * Turns a buffered request body into the appropriate BodyType for hook payloads, based on the
+ * declared Content-Type - JSON and text bodies are decoded so hooks get a usable value (a parsed
+ * object / a string) instead of having to base64-decode raw bytes themselves. Anything else (or a
+ * Content-Type: application/json that turns out not to actually be valid JSON) is passed through
+ * as raw bytes rather than guessed at.
+ */
+function decodeRequestBodyForHooks(
+  bytes: Uint8Array | undefined,
+  contentTypeHeader: string | string[] | undefined,
+): BodyType | null {
+  if (!bytes || bytes.length === 0) {
+    return null;
+  }
+
+  const contentType = extractContentType(getSingleHeaderValue(contentTypeHeader));
+
+  if (contentType === 'application/json' || contentType.endsWith('+json')) {
+    try {
+      return { type: 'json', payload: JSON.parse(Buffer.from(bytes).toString('utf-8')) };
+    } catch {
+      // Declared as JSON but not actually parseable - fall through to raw bytes below.
+    }
+  } else if (contentType.startsWith('text/')) {
+    return { type: 'text', payload: Buffer.from(bytes).toString('utf-8') };
+  }
+
+  return { type: 'binary.uint8array', payload: bytes };
+}
+
+/**
+ * Extracts the content type from a header value, stripping parameters like charset (e.g.
+ * "application/json; charset=utf-8" -> "application/json").
+ */
+function extractContentType(headerValue: string | undefined): string {
+  if (!headerValue) {
+    return '';
+  }
+
+  return headerValue.split(';')[0].trim().toLowerCase();
 }
 
 function requestTypeToProxyRequest(request: RequestType): {
