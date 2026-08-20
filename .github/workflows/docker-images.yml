@@ -1,28 +1,32 @@
 name: Build and Publish Docker Images
 
-# Two ways in:
-# - workflow_run: today's behavior - build/push a floating `:latest` image
-#   per app after "CI - Tests" passes on `main`. Only fires for pushes to
-#   main (test.yml doesn't listen to tags), so this path never sees a tag
-#   ref and always falls into the `:latest` branch below.
-# - push (tags: v*): stable release builds, mirroring every other fsarch
-#   app repo's image.yml - versioned + :stable tags, then a
-#   repository_dispatch to helm-charts so bump-chart.yaml can pick it up.
-#   Deliberately NOT gated on CI - tag pushes aren't covered by test.yml's
-#   triggers either, same as everywhere else in this org.
+# Single way in: workflow_run, fired after "CI - Tests" completes. test.yml
+# listens to both `main` pushes and `v*` tag pushes, so every image build -
+# floating `:latest` as well as versioned/`:stable` releases - only happens
+# once the corresponding commit has actually passed CI. Mirrors dashboard's
+# image.yml, which is the only other fsarch repo gating tag releases on CI
+# this way; every other repo's image.yml builds straight off `push` with no
+# CI gate at all.
 on:
   workflow_run:
     workflows: ["CI - Tests"]
     types:
       - completed
-  push:
-    tags:
-      - 'v*'
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event.workflow_run.conclusion == 'success'
+    # For workflow_run events triggered by a tag push, head_branch holds the
+    # tag name (e.g. "v1.2.3"), not a branch - so this also has to accept
+    # that, not just "main".
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        (
+          github.event.workflow_run.head_branch == 'main' ||
+          startsWith(github.event.workflow_run.head_branch, 'v')
+        )
+      }}
     strategy:
       matrix:
         include:
@@ -40,9 +44,9 @@ jobs:
       - name: checkout code
         uses: actions/checkout@v7
         with:
-          # For workflow_run, build the exact commit that passed CI rather
-          # than whatever HEAD of main happens to be by the time this runs.
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+          # Build the exact commit that passed CI rather than whatever HEAD
+          # of the branch/tag happens to be by the time this runs.
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       # https://github.com/docker/setup-qemu-action
       - name: Set up QEMU
@@ -61,10 +65,17 @@ jobs:
         id: image
         env:
           IMAGE: fsarch/${{ matrix.image }}
+          # For workflow_run events, GITHUB_REF always reflects this workflow
+          # file's own ref (the default branch), not the ref that triggered
+          # the upstream "CI - Tests" run - so it can't be used to detect a
+          # tag push here. Use the workflow_run payload instead, which holds
+          # the tag name (without the "refs/tags/" prefix) in head_branch
+          # when the trigger was a tag push.
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            VERSION="${GITHUB_REF#refs/tags/v}"
+          if [[ "${HEAD_BRANCH}" == v* ]]; then
+            VERSION="${HEAD_BRANCH#v}"
             TAGS="${IMAGE}:${VERSION}"
             # only mark proper releases (no prerelease suffix, e.g. -beta.0) as stable
             if [[ "${VERSION}" != *-* ]]; then
@@ -81,13 +92,17 @@ jobs:
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push ${{ matrix.image }}
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.image.outputs.tags }}
+        run: |
+          TAG_ARGS=""
+          for tag in ${{ steps.image.outputs.tags }}; do
+            TAG_ARGS="${TAG_ARGS} --tag ${tag}"
+          done
+
+          docker buildx build \
+            ${TAG_ARGS} \
+            --file ${{ matrix.dockerfile }} \
+            --platform linux/amd64,linux/arm64 \
+            --push .
 
       - name: notify helm-charts of the new release
         # success() is required here because a custom `if:` replaces the
