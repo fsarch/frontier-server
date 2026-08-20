@@ -1,5 +1,8 @@
 {
   "name": "frontier",
+  "scripts": {
+    "version": "lerna version"
+  },
   "workspaces": [
     "apps/*"
   ],
