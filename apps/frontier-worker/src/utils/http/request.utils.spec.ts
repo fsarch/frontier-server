@@ -88,6 +88,7 @@ describe('RequestUtils', () => {
     describe('plainObjectToRequest', () => {
         it('should convert RequestType to Request with GET', () => {
             const requestType: RequestType = {
+                type: 'request',
                 method: 'GET',
                 url: {
                     scheme: 'https',
@@ -114,6 +115,7 @@ describe('RequestUtils', () => {
 
         it('should convert RequestType to Request with POST and body', async () => {
             const requestType: RequestType = {
+                type: 'request',
                 method: 'POST',
                 url: {
                     scheme: 'http',
@@ -145,6 +147,7 @@ describe('RequestUtils', () => {
 
         it('should handle RequestType with multiple query parameters', () => {
             const requestType: RequestType = {
+                type: 'request',
                 method: 'GET',
                 url: {
                     scheme: 'https',
@@ -168,6 +171,7 @@ describe('RequestUtils', () => {
 
         it('should handle RequestType with port 0', () => {
             const requestType: RequestType = {
+                type: 'request',
                 method: 'GET',
                 url: {
                     scheme: 'http',

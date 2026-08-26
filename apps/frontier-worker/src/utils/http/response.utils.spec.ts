@@ -93,6 +93,7 @@ describe('ResponseUtils', () => {
     describe('plainObjectToResponse', () => {
         it('should convert ResponseType to Response with status 200', async () => {
             const responseType: ResponseType = {
+                type: 'response',
                 statusCode: 200,
                 statusText: 'OK',
                 headers: {
@@ -115,6 +116,7 @@ describe('ResponseUtils', () => {
 
         it('should convert ResponseType to Response with status 404', async () => {
             const responseType: ResponseType = {
+                type: 'response',
                 statusCode: 404,
                 statusText: 'Not Found',
                 headers: {},
@@ -134,6 +136,7 @@ describe('ResponseUtils', () => {
 
         it('should handle ResponseType with null body', async () => {
             const responseType: ResponseType = {
+                type: 'response',
                 statusCode: 204,
                 statusText: 'No Content',
                 headers: {},
@@ -150,6 +153,7 @@ describe('ResponseUtils', () => {
 
         it('should handle ResponseType with empty object body', async () => {
             const responseType: ResponseType = {
+                type: 'response',
                 statusCode: 200,
                 statusText: 'OK',
                 headers: {},
@@ -166,6 +170,7 @@ describe('ResponseUtils', () => {
 
         it('should handle ResponseType with multiple headers', () => {
             const responseType: ResponseType = {
+                type: 'response',
                 statusCode: 200,
                 statusText: 'OK',
                 headers: {
@@ -188,6 +193,7 @@ describe('ResponseUtils', () => {
 
         it('should handle ResponseType with array payload', async () => {
             const responseType: ResponseType = {
+                type: 'response',
                 statusCode: 200,
                 statusText: 'OK',
                 headers: {},
@@ -259,7 +265,7 @@ describe('ResponseUtils', () => {
 
         it('should convert ResponseType with binary.uint8array to Response', async () => {
             const binaryData = new Uint8Array([65, 66, 67, 68]); // 'ABCD' in ASCII
-            const responseType = {
+            const responseType: ResponseType = {
                 type: 'response',
                 statusCode: 200,
                 statusText: 'OK',
@@ -282,7 +288,7 @@ describe('ResponseUtils', () => {
 
         it('should handle ResponseType with binary.uint8array body', async () => {
             const binaryData = new Uint8Array([72, 101, 108, 108, 111]); // 'Hello' in ASCII
-            const responseType = {
+            const responseType: ResponseType = {
                 type: 'response',
                 statusCode: 200,
                 statusText: 'OK',
