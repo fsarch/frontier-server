@@ -236,7 +236,7 @@ describe('RequestUtils', () => {
                 headers: {},
                 body: {
                     type: 'binary.uint8array',
-                    payload: binaryData,
+                    payload: Buffer.from(binaryData).toString('base64'),
                 },
             };
 

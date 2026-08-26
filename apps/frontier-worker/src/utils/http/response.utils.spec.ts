@@ -266,7 +266,7 @@ describe('ResponseUtils', () => {
                 headers: { 'Content-Type': ['application/octet-stream'] },
                 body: {
                     type: 'binary.uint8array',
-                    payload: binaryData,
+                    payload: Buffer.from(binaryData).toString('base64'),
                 },
             };
 
@@ -289,7 +289,7 @@ describe('ResponseUtils', () => {
                 headers: { 'Content-Type': ['application/octet-stream'] },
                 body: {
                     type: 'binary.uint8array',
-                    payload: binaryData,
+                    payload: Buffer.from(binaryData).toString('base64'),
                 },
             };
 

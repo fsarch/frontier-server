@@ -151,7 +151,7 @@ describe('BodyUtils', () => {
             const binaryData = new Uint8Array([1, 2, 3, 4, 5]);
             const bodyType = {
                 type: 'binary.uint8array',
-                payload: binaryData,
+                payload: Buffer.from(binaryData).toString('base64'),
             };
 
             const result = BodyUtils.plainObjectToBody(bodyType);
@@ -166,8 +166,11 @@ describe('BodyUtils', () => {
             const result = await BodyUtils.bodyToPlainObject(binaryData);
 
             expect(result.type).toBe('binary.uint8array');
-            expect(result.payload).toBeInstanceOf(Uint8Array);
-            expect(result.payload).toEqual(binaryData);
+            // payload is base64-encoded so it survives JSON.stringify/JSON.parse (see
+            // BinaryUint8ArrayBodyType) - a raw Uint8Array/Buffer does not.
+            expect(typeof result.payload).toBe('string');
+            expect(result.payload).toBe(Buffer.from(binaryData).toString('base64'));
+            expect(JSON.parse(JSON.stringify(result))).toEqual(result);
         });
 
         it('should convert ArrayBuffer to binary.uint8array BodyType', async () => {
@@ -181,8 +184,8 @@ describe('BodyUtils', () => {
             const result = await BodyUtils.bodyToPlainObject(arrayBuffer);
 
             expect(result.type).toBe('binary.uint8array');
-            expect(result.payload).toBeInstanceOf(Uint8Array);
-            expect(result.payload).toEqual(new Uint8Array([1, 2, 3, 4]));
+            expect(typeof result.payload).toBe('string');
+            expect(result.payload).toBe(Buffer.from(new Uint8Array([1, 2, 3, 4])).toString('base64'));
         });
 
         it('should convert empty Uint8Array to binary.uint8array BodyType', async () => {
@@ -190,8 +193,7 @@ describe('BodyUtils', () => {
             const result = await BodyUtils.bodyToPlainObject(emptyData);
 
             expect(result.type).toBe('binary.uint8array');
-            expect(result.payload).toBeInstanceOf(Uint8Array);
-            expect(result.payload).toHaveLength(0);
+            expect(result.payload).toBe('');
         });
     });
 
@@ -217,6 +219,21 @@ describe('BodyUtils', () => {
 
             expect(result).toBeInstanceOf(Uint8Array);
             expect(result).toEqual(view);
+        });
+
+        it('should survive a JSON.stringify/JSON.parse round trip (e.g. across the function-server HTTP boundary), even when the source bytes are a Node Buffer', async () => {
+            // Buffer.concat (used to buffer request bodies, see http-proxy.server.ts) returns a
+            // Buffer, not a plain Uint8Array. Buffer overrides toJSON(), so JSON.stringify-ing one
+            // directly produces `{ type: 'Buffer', data: [...] }` instead of preserving the bytes -
+            // this is the bug the base64 encoding in bodyToPlainObject/plainObjectToBody avoids.
+            const original = Buffer.from([255, 128, 64, 32, 0, 1]);
+            const bodyType = await BodyUtils.bodyToPlainObject(original);
+
+            const wireBodyType = JSON.parse(JSON.stringify(bodyType));
+            const result = BodyUtils.plainObjectToBody(wireBodyType);
+
+            expect(result).toBeInstanceOf(Uint8Array);
+            expect(result).toEqual(new Uint8Array(original));
         });
     });
 });

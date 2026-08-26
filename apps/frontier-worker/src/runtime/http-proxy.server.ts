@@ -821,7 +821,7 @@ function decodeRequestBodyForHooks(
     return { type: 'text', payload: Buffer.from(bytes).toString('utf-8') };
   }
 
-  return { type: 'binary.uint8array', payload: bytes };
+  return { type: 'binary.uint8array', payload: Buffer.from(bytes).toString('base64') };
 }
 
 /**

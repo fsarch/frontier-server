@@ -501,6 +501,12 @@ function isBodyType(value: unknown): value is ResponseType['body'] {
     return false;
   }
 
+  // Text and binary payloads must be strings on the wire (binary is base64-encoded, see
+  // BinaryUint8ArrayBodyType) - a hook echoing back something else means it mangled the body.
+  if ((value.type === 'text' || value.type === 'binary.uint8array') && typeof (value as { payload: unknown }).payload !== 'string') {
+    return false;
+  }
+
   return true;
 }
 

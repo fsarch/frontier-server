@@ -10,18 +10,19 @@ async function bodyToPlainObject(body: BodyInit | null | unknown): Promise<BodyT
         return null;
     }
 
-    // Handle Uint8Array and ArrayBuffer for binary data
+    // Handle Uint8Array and ArrayBuffer for binary data. The payload is base64-encoded so it
+    // survives a JSON.stringify/JSON.parse round trip unchanged (see BinaryUint8ArrayBodyType).
     if (body instanceof Uint8Array) {
         return {
             type: 'binary.uint8array',
-            payload: body,
+            payload: Buffer.from(body).toString('base64'),
         };
     }
-    
+
     if (body instanceof ArrayBuffer) {
         return {
             type: 'binary.uint8array',
-            payload: new Uint8Array(body),
+            payload: Buffer.from(body).toString('base64'),
         };
     }
     
@@ -96,7 +97,7 @@ function plainObjectToBody(bodyType: BodyType | null): string | Uint8Array | nul
     }
 
     if (bodyType.type === 'binary.uint8array') {
-        return bodyType.payload;
+        return new Uint8Array(Buffer.from(bodyType.payload, 'base64'));
     }
 
     if (bodyType.payload === null || bodyType.payload === undefined) {

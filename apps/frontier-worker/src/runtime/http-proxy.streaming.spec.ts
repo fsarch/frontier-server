@@ -238,8 +238,10 @@ describe('HttpProxyServer request body handling', () => {
     expect(executeHookSpy).toHaveBeenCalled();
 
     // The pre-hook must see the full body materialized as a binary.uint8array, matching the original bytes exactly.
+    // The payload is base64-encoded (see BinaryUint8ArrayBodyType) so it survives being handed to
+    // executeHook, which JSON-serializes it for the (mocked) remote function server call.
     expect((capturedBody as any)?.type).toBe('binary.uint8array');
-    expect(Buffer.compare(Buffer.from((capturedBody as any).payload), payload)).toBe(0);
+    expect(Buffer.compare(Buffer.from((capturedBody as any).payload, 'base64'), payload)).toBe(0);
 
     // Because a pre-hook ran, the buffered bytes are sent upstream as a fixed-length body (content-length, not chunked).
     expect(upstream.requests).toHaveLength(1);
@@ -316,7 +318,7 @@ describe('HttpProxyServer request body handling', () => {
 
     expect(response.statusCode).toBe(200);
     expect((capturedBody as any)?.type).toBe('binary.uint8array');
-    expect(Buffer.from((capturedBody as any).payload).toString('utf-8')).toBe('not actually json');
+    expect(Buffer.from((capturedBody as any).payload, 'base64').toString('utf-8')).toBe('not actually json');
   });
 
   it('does not buffer GET requests and forwards them without a body', async () => {
