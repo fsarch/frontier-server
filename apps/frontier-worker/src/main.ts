@@ -2,6 +2,7 @@ import { ControlPlaneClient } from './control-plane/control-plane.client.js';
 import { HttpProxyServer, RequestLogPayload } from './runtime/http-proxy.server.js';
 import { FunctionClient } from './runtime/function-client.js';
 import { loadWorkerConfig } from './runtime/config-loader.js';
+import { shutdownTracing } from './tracing/tracing.js';
 
 const workerPort = parseInt(process.env.FRONTIER_WORKER_PORT ?? '8080', 10);
 const controlPlaneUrl = process.env.FRONTIER_CONTROL_PLANE_URL ?? 'ws://localhost:3000/api/workers/websocket';
@@ -45,6 +46,7 @@ async function bootstrap() {
   const shutdown = async () => {
     controlPlane.stop();
     await proxyServer.stop();
+    await shutdownTracing();
     process.exit(0);
   };
 

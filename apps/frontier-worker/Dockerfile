@@ -43,5 +43,5 @@ WORKDIR /usr/src/app/apps/frontier-worker
 
 EXPOSE 8080
 
-CMD ["node", "dist/main"]
+CMD ["node", "--import", "./dist/tracing/register.js", "dist/main"]
 

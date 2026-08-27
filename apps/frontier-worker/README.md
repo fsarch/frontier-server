@@ -28,6 +28,28 @@ The worker runtime follows a split control/data-plane approach:
 - `FRONTIER_CONTROL_PLANE_URL` (default `ws://localhost:3000/api/workers/websocket`)
 - `FRONTIER_WORKER_AUTH_TOKEN` (default `Test`)
 - `FRONTIER_WORKER_HEARTBEAT_MS` (default `10000`)
+- `FRONTIER_WORKER_TRACING_ENABLED` (default `false`) - enables OpenTelemetry tracing
+- `FRONTIER_WORKER_TRACING_SERVICE_NAME` (default `frontier-worker`)
+- `FRONTIER_WORKER_TRACING_SERVICE_VERSION` (optional)
+- `FRONTIER_WORKER_TRACING_SAMPLE_RATIO` (default `1`) - `0`-`1`
+- `FRONTIER_WORKER_TRACING_EXPORTER` (default `console`) - `console` | `otlp-http` | `otlp-grpc`
+- `FRONTIER_WORKER_TRACING_EXPORTER_URL` (required for `otlp-http`/`otlp-grpc`)
+- `FRONTIER_WORKER_TRACING_EXPORTER_HEADERS` (optional, JSON object string, e.g. `{"authorization":"Bearer ..."}`)
+
+## Tracing
+
+When `FRONTIER_WORKER_TRACING_ENABLED=true`, the worker exports OpenTelemetry traces the same
+way `frontier-api` does (see `@fsarch/server`'s built-in tracing) - a server span per proxied
+request (raw `http.Server` instrumentation) and a client span per outgoing call (upstream
+forward + request-log ingest, both go through `undici`/global `fetch`). Trace context propagates
+automatically from the incoming request to the outgoing upstream call, so a `frontier-worker` span
+shows up as a child of whatever called it and a parent of the upstream call, as long as the caller
+and upstream participate in the same trace (W3C `traceparent` propagation).
+
+Tracing is wired up via `node --import ./dist/tracing/register.js` (see the `start*` scripts and
+`Dockerfile`) rather than a normal import in `main.ts`, because ESM built-in modules (`http`,
+`undici`) need OpenTelemetry's loader hook registered before they are first imported anywhere in
+the process.
 
 ## Control Plane Events (MVP)
 
