@@ -20,20 +20,22 @@ This repository is a monorepo with two NestJS-based applications:
 
 ## Docker Images
 
-Images are published to Docker Hub:
+Each app publishes to its own Docker Hub repository (matching the
+`fsarch/helm-charts` chart names, not the `apps/*` directory names -
+`frontier-api` publishes as `frontier-server` to match this repo's own
+name):
 
-- `https://hub.docker.com/repository/docker/fsarch/frontier-server`
+- `https://hub.docker.com/r/fsarch/frontier-server` for `apps/frontier-api`
+- `https://hub.docker.com/r/fsarch/frontier-worker` for `apps/frontier-worker`
 
-The project uses the following tags:
-
-- `latest-api` for `frontier-api`
-- `latest-worker` for `frontier-worker`
+Tags: `latest` (floating, off `main`), `<version>` and `stable` (off `vX.Y.Z`
+release tags).
 
 Example pull commands:
 
 ```bash
-docker pull fsarch/frontier-server:latest-api
-docker pull fsarch/frontier-server:latest-worker
+docker pull fsarch/frontier-server:stable
+docker pull fsarch/frontier-worker:stable
 ```
 
 ## Prerequisites
@@ -74,6 +76,19 @@ npm --workspace apps/frontier-api run test
 npm --workspace apps/frontier-worker run build
 npm --workspace apps/frontier-worker run test
 ```
+
+## Tracing
+
+Both apps support OpenTelemetry distributed tracing, off by default:
+
+- `frontier-api` gets it automatically from `@fsarch/server` - enable via
+  the `tracing:` section of `config.yml` (see `apps/frontier-api/README.md`).
+- `frontier-worker` is env-var configured (`FRONTIER_WORKER_TRACING_*`, see
+  `apps/frontier-worker/README.md`).
+
+Trace context propagates across the control-plane/data-plane boundary (W3C
+`traceparent`), so a trace started at `frontier-api` continues into
+`frontier-worker` and vice versa when both have tracing enabled.
 
 ## Notes
 

@@ -25,6 +25,19 @@ workers:
     auth_token: 'change-me'
     config_check_interval_ms: 2000
 
+# OpenTelemetry tracing (@fsarch/server built-in, no code changes needed).
+# Off by default; flip `enabled: true` and point `exporter` at a real
+# collector (otlp-http/otlp-grpc) or use `console` for local debugging.
+# tracing:
+#   enabled: true
+#   serviceName: frontier-api
+#   sampleRatio: 1.0
+#   exporter:
+#     type: otlp-http
+#     url: http://localhost:4318/v1/traces
+#     headers:
+#       Authorization: 'Bearer secret'
+
 remote-events:
   type: static
   hosts:
