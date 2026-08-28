@@ -29,6 +29,12 @@ FROM node:24.14.1-trixie-slim AS runner
 ENV NODE_ENV=production
 ENV PORT=8080
 
+# Preloads OpenTelemetry auto-instrumentation (HTTP/Express/Nest) before the
+# app's own module graph loads — required for `tracing.enabled: true` in
+# config.yaml to actually instrument anything, no-op otherwise. See
+# https://github.com/fsarch/server#tracing-opentelemetry
+ENV NODE_OPTIONS "--import @fsarch/server/register"
+
 WORKDIR /usr/src/app
 
 COPY package*.json ./
