@@ -1,21 +1,21 @@
 # syntax=docker/dockerfile:1
 
-FROM node:24.14.1-trixie-slim AS deps
+FROM node:24.14.1-trixie-slim AS base
 
 WORKDIR /usr/src/app
 
 COPY package*.json ./
 COPY apps/frontier-worker/package*.json ./apps/frontier-worker/
+
+
+FROM base AS deps
+
+ENV NODE_ENV=production
 
 RUN npm ci --fetch-timeout=300000 --workspace apps/frontier-worker --include-workspace-root=false
 
 
-FROM node:24.14.1-trixie-slim AS builder
-
-WORKDIR /usr/src/app
-
-COPY package*.json ./
-COPY apps/frontier-worker/package*.json ./apps/frontier-worker/
+FROM base AS builder
 
 RUN npm ci --fetch-timeout=300000 --workspace apps/frontier-worker --include-workspace-root=false
 
@@ -24,24 +24,16 @@ COPY apps/frontier-worker ./apps/frontier-worker
 RUN npm --workspace apps/frontier-worker run build
 
 
-FROM node:24.14.1-trixie-slim AS runner
+FROM base
 
 ENV NODE_ENV=production
 ENV FRONTIER_WORKER_PORT=8080
 
-WORKDIR /usr/src/app
+EXPOSE 8080
 
-COPY package*.json ./
-COPY apps/frontier-worker/package*.json ./apps/frontier-worker/
-
-RUN npm ci --omit=dev --fetch-timeout=300000 --workspace apps/frontier-worker --include-workspace-root=false \
-    && npm cache clean --force
-
+COPY --from=deps /usr/src/app ./
 COPY --from=builder /usr/src/app/apps/frontier-worker/dist ./apps/frontier-worker/dist
 
 WORKDIR /usr/src/app/apps/frontier-worker
 
-EXPOSE 8080
-
 CMD ["node", "--import", "./dist/tracing/register.js", "dist/main"]
-
