@@ -12,11 +12,19 @@ FROM base AS deps
 
 ENV NODE_ENV=production
 
+RUN apt-get update && \
+    apt-get install -y node-gyp && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 RUN npm ci --fetch-timeout=300000 --workspace apps/frontier-worker --include-workspace-root=false
 
 
 FROM base AS builder
 
+RUN apt-get update && \
+    apt-get install -y node-gyp && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 RUN npm ci --fetch-timeout=300000 --workspace apps/frontier-worker --include-workspace-root=false
 
 COPY apps/frontier-worker ./apps/frontier-worker
