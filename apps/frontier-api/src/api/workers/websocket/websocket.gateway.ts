@@ -7,6 +7,7 @@ import { Inject, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { WebSocket } from "ws";
 import { ModuleConfigurationService } from '@fsarch/server/configuration';
 import { Span } from '@fsarch/server/tracing';
+import { Public } from '@fsarch/server/auth';
 import { ConfigWorkersType } from "../../../types/config.type.js";
 import { WorkerBootstrapService, WorkerConfigSnapshot } from '../worker-bootstrap.service.js';
 
@@ -19,6 +20,7 @@ type WebSocketResponseMessage<T> = {
   transports: 'websocket',
   path: '/api/workers/websocket'
 })
+@Public()
 export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnModuleDestroy {
   private readonly clients = new Set<WebSocket>();
   private configVersion = 0;
