@@ -5,6 +5,7 @@ import { Between, FindOptionsSelect, FindOptionsWhere, LessThan, MoreThan, Repos
 import { RequestLog } from '../../../database/entities/request-log.entity.js';
 import { RequestLogQueryDto, WorkerRequestLogCreateDto } from '../../../models/request-log.model.js';
 import { LogPolicy } from '../../../database/entities/log-policy.entity.js';
+import { Span } from "@fsarch/server/tracing";
 
 @Injectable()
 export class RequestLogService {
@@ -80,7 +81,10 @@ export class RequestLogService {
     });
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Span({
+    name: 'frontier-server.request-log.cleanupExpiredLogs',
+  })
   public async cleanupExpiredLogs(): Promise<void> {
     await this.requestLogRepository.delete({
       expirationTime: LessThan(new Date()),
