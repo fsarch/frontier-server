@@ -6,6 +6,7 @@ import { CompiledHookFunction, CompiledHooks } from './compiled-config.js';
 import { PostHookExecutionResult, PreHookExecutionResult } from "./function-hooks.js";
 import { PreHookPayload } from './models/pre-hook-payload.js';
 import { PostHookPayload } from './models/post-hook-payload.js';
+import { withSpan } from '../tracing/tracing.js';
 
 // Typ für Hook-Konfiguration
 export type HookConfig = {
@@ -56,65 +57,79 @@ export class FunctionClient {
     hook: CompiledHookFunction,
     hookPayload: PreHookPayload | PostHookPayload,
   ): Promise<{ statusCode: number; headers: Record<string, string>; body: unknown }> {
-    const functionConfig = this.getFunctionConfig();
-    if (!functionConfig) {
-      throw new Error(`Function server not configured`);
-    }
+    return withSpan(
+      'frontier-worker.functionClient.executeHook',
+      async (span) => {
+        const functionConfig = this.getFunctionConfig();
+        if (!functionConfig) {
+          throw new Error(`Function server not configured`);
+        }
 
-    // Token abrufen
-    const accessToken = await this.getAccessToken(functionConfig);
+        // Token abrufen
+        const accessToken = await this.getAccessToken(functionConfig);
 
-    // Hook-URL zusammenbauen
-    const hookUrl = `${functionConfig.url}/v1/functions/${hook.functionId}/executions?wait=true`;
+        // Hook-URL zusammenbauen
+        const hookUrl = `${functionConfig.url}/v1/functions/${hook.functionId}/executions?wait=true`;
+        span.setAttribute('frontier.hook_url', hookUrl);
 
-    const options = {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${accessToken}`,
-        'content-type': 'application/json',
+        const options = {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            arguments: [hookPayload],
+          }),
+        };
+
+        this.debug(`executing hook: id=${hook.id} url=${hookUrl}`);
+
+        // Timeout setzen
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5_000);
+
+        try {
+          const response = await fetch(hookUrl, {
+            ...options,
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+          span.setAttribute('http.status_code', response.status);
+
+          // Response parsen
+          let responseBody: { result?: unknown };
+          try {
+            responseBody = await response.json();
+          } catch(ex) {
+            this.debug(`failed to parse hook response as JSON: id=${hook.id} status=${response.status}`);
+            throw ex;
+          }
+
+          this.debug(`hook executed: id=${hook.id} status=${response.status}`);
+
+          return {
+            statusCode: response.status,
+            headers: Object.fromEntries(response.headers.entries()),
+            body: responseBody.result,
+          };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error(`[worker][function-client] hook request failed: id=${hook.id} hook=${hook.name} url=${hookUrl} error=${errorMessage}`);
+          throw error;
+        } finally {
+          clearTimeout(timeoutId);
+        }
       },
-      body: JSON.stringify({
-        arguments: [hookPayload],
-      }),
-    };
-
-    this.debug(`executing hook: id=${hook.id} url=${hookUrl}`);
-
-    // Timeout setzen
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5_000);
-
-    try {
-      const response = await fetch(hookUrl, {
-        ...options,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      // Response parsen
-      let responseBody: { result?: unknown };
-      try {
-        responseBody = await response.json();
-      } catch(ex) {
-        this.debug(`failed to parse hook response as JSON: id=${hook.id} status=${response.status}`);
-        throw ex;
-      }
-
-      this.debug(`hook executed: id=${hook.id} status=${response.status}`);
-
-      return {
-        statusCode: response.status,
-        headers: Object.fromEntries(response.headers.entries()),
-        body: responseBody.result,
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`[worker][function-client] hook request failed: id=${hook.id} hook=${hook.name} url=${hookUrl} error=${errorMessage}`);
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
-    }
+      {
+        attributes: {
+          'frontier.hook_id': hook.id,
+          'frontier.hook_name': hook.name,
+          'frontier.function_id': hook.functionId,
+        },
+      },
+    );
   }
 
   public async executePreHooks(

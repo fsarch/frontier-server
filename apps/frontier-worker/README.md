@@ -46,6 +46,24 @@ automatically from the incoming request to the outgoing upstream call, so a `fro
 shows up as a child of whatever called it and a parent of the upstream call, as long as the caller
 and upstream participate in the same trace (W3C `traceparent` propagation).
 
+On top of that auto-instrumentation, `HttpProxyServer` creates its own child spans (via the
+`withSpan` helper in `tracing/tracing.ts`, the same shape as `@fsarch/server/tracing`'s `withSpan`)
+for the request-pipeline stages that would otherwise be invisible in the waterfall:
+
+- `frontier-worker.resolveRoute` - route-table lookup (`frontier.host`, `frontier.path`,
+  `frontier.route_found`); on a match the incoming request's root span is additionally tagged with
+  `frontier.domain_group_id`/`frontier.path_rule_id` so it can be filtered on directly.
+- `frontier-worker.preHooks` / `frontier-worker.postHooks` - the whole pre/post-hook chain for the
+  route (`frontier.path_rule_id`, `frontier.hook_count`), each wrapping one or more...
+- `frontier-worker.functionClient.executeHook` - a single hook invocation (`frontier.hook_id`,
+  `frontier.hook_name`, `frontier.function_id`, `http.status_code`), parent of the `undici` span for
+  the actual call to the function server.
+- `frontier-worker.forwardToUpstream` - the upstream fetch (`frontier.upstream_url`, `http.method`,
+  `frontier.path_rule_id`, `http.status_code`), parent of the `undici` span for that call.
+
+All of these record exceptions and set an ERROR span status on failure, so a failed hook or
+upstream call is visible without having to correlate with logs.
+
 Tracing is wired up via `node --import ./dist/tracing/register.js` (see the `start*` scripts and
 `Dockerfile`) rather than a normal import in `main.ts`, because ESM built-in modules (`http`,
 `undici`) need OpenTelemetry's loader hook registered before they are first imported anywhere in

@@ -2,6 +2,8 @@ import { createServer, IncomingHttpHeaders, IncomingMessage, Server, ServerRespo
 import { gunzip as zlibGunzip } from 'zlib';
 import { promisify } from 'util';
 import { Agent as UndiciAgent, type RequestInit, type Response, fetch } from 'undici';
+import { trace } from '@opentelemetry/api';
+import { withSpan } from '../tracing/tracing.js';
 
 const gunzipAsync = promisify(zlibGunzip);
 import { buildUpstreamPath, CompiledWorkerConfig } from './compiled-config.js';
@@ -173,7 +175,15 @@ export class HttpProxyServer {
         return;
       }
 
-      const route = this.activeConfig.resolve(hostHeader, requestUrl.pathname);
+      const route = withSpan(
+        'frontier-worker.resolveRoute',
+        (span) => {
+          const resolved = this.activeConfig!.resolve(hostHeader, requestUrl.pathname);
+          span.setAttribute('frontier.route_found', resolved !== null);
+          return resolved;
+        },
+        { attributes: { 'frontier.host': hostHeader ?? '<missing>', 'frontier.path': requestUrl.pathname } },
+      );
       resolvedRoute = route;
 
       if (!route) {
@@ -181,6 +191,13 @@ export class HttpProxyServer {
         res.writeHead(404).end('no route for request');
         return;
       }
+
+      // Enrich the request span (created by HttpInstrumentation for the incoming http.Server
+      // request) with the resolved route so it can be found/filtered on in a trace backend.
+      trace.getActiveSpan()?.setAttributes({
+        'frontier.domain_group_id': route.domainGroupId,
+        'frontier.path_rule_id': route.pathRuleId,
+      });
 
       const upstreamPath = buildUpstreamPath(route.upstream.basePath, route.pathPrefix, requestUrl.pathname);
       upstreamUrl = `${route.upstream.protocol}://${route.upstream.host}:${route.upstream.port}${upstreamPath}${requestUrl.search}`;
@@ -344,10 +361,24 @@ export class HttpProxyServer {
       if (route.upstream.protocol === 'https' && route.upstream.sslVerify === false) {
         this.debug(`ssl verification disabled for upstream ${route.upstream.host}:${route.upstream.port}`);
       }
-      const upstreamRes = await fetchWithOptionalInsecureTls(
-        upstreamUrl,
-        upstreamFetchOptions,
-        route.upstream.protocol === 'https' && route.upstream.sslVerify === false,
+      const upstreamRes = await withSpan(
+        'frontier-worker.forwardToUpstream',
+        async (span) => {
+          const res = await fetchWithOptionalInsecureTls(
+            upstreamUrl,
+            upstreamFetchOptions,
+            route.upstream.protocol === 'https' && route.upstream.sslVerify === false,
+          );
+          span.setAttribute('http.status_code', res.status);
+          return res;
+        },
+        {
+          attributes: {
+            'frontier.upstream_url': upstreamUrl,
+            'http.method': modifiedRequest.method,
+            'frontier.path_rule_id': route.pathRuleId,
+          },
+        },
       );
       console.log(`[worker][upstream] response: method=${modifiedRequest.method} url=${upstreamUrl} status=${upstreamRes.status}`);
 

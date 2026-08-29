@@ -6,7 +6,7 @@ import { Metadata } from '@grpc/grpc-js';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { UndiciInstrumentation } from '@opentelemetry/instrumentation-undici';
 import { resourceFromAttributes } from '@opentelemetry/resources';
-import { trace, type Tracer } from '@opentelemetry/api';
+import { trace, SpanStatusCode, type Span, type Tracer } from '@opentelemetry/api';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 
 const DEFAULT_TRACER_NAME = 'frontier-worker';
@@ -140,4 +140,57 @@ export async function shutdownTracing(): Promise<void> {
 
 export function getTracer(name: string = DEFAULT_TRACER_NAME): Tracer {
   return trace.getTracer(name);
+}
+
+function finishSpan(span: Span, error?: unknown): void {
+  if (error !== undefined) {
+    span.recordException(error instanceof Error ? error : new Error(String(error)));
+    span.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  } else {
+    span.setStatus({ code: SpanStatusCode.OK });
+  }
+  span.end();
+}
+
+// Wraps `fn` in a span active for its duration - used to give the internal proxy pipeline
+// stages (route resolution, hook execution, upstream forwarding, ...) their own spans nested
+// under the request span that HttpInstrumentation already created, rather than relying solely
+// on the coarse-grained auto-instrumentation. Mirrors the equivalent helper in
+// `@fsarch/server/tracing` used by frontier-api.
+export function withSpan<T>(
+  name: string,
+  fn: (span: Span) => T,
+  options?: { tracerName?: string; attributes?: Record<string, string | number | boolean> },
+): T {
+  const tracer = getTracer(options?.tracerName);
+  return tracer.startActiveSpan(name, (span) => {
+    if (options?.attributes) {
+      span.setAttributes(options.attributes);
+    }
+
+    try {
+      const result = fn(span);
+      if (result instanceof Promise) {
+        return result.then(
+          (value) => {
+            finishSpan(span);
+            return value;
+          },
+          (error) => {
+            finishSpan(span, error);
+            throw error;
+          },
+        ) as T;
+      }
+
+      finishSpan(span);
+      return result;
+    } catch (error) {
+      finishSpan(span, error);
+      throw error;
+    }
+  });
 }

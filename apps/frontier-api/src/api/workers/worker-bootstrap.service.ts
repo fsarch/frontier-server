@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
+import { Span } from '@fsarch/server/tracing';
 import { DomainGroupService } from "../domain-group/domain-group.service.js";
 import { DomainService } from "../domain-group/domain/domain.service.js";
 import { CachePolicyService } from "../domain-group/cache-policy/cache-policy.service.js";
@@ -84,6 +85,7 @@ export class WorkerBootstrapService {
    * Builds a complete snapshot of all worker configuration entities.
    * This is the same logic used by the WebSocket bootstrap handler.
    */
+  @Span()
   public async buildSnapshot(): Promise<WorkerConfigSnapshot> {
     const [
       domainGroups,
@@ -141,6 +143,7 @@ export class WorkerBootstrapService {
   /**
    * Calculates a SHA-256 checksum for the snapshot to detect changes.
    */
+  @Span()
   public getSnapshotChecksum(snapshot: WorkerConfigSnapshot): string {
     return createHash('sha256')
       .update(JSON.stringify(snapshot))
@@ -151,6 +154,7 @@ export class WorkerBootstrapService {
    * Returns the full bootstrap response (version, checksum, snapshot).
    * This matches the WebSocket bootstrap response format.
    */
+  @Span()
   public async getBootstrapResponse(configVersion: number, configChecksum: string): Promise<{
     version: number;
     checksum: string;

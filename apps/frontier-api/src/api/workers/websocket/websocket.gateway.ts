@@ -6,6 +6,7 @@ import {
 import { Inject, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { WebSocket } from "ws";
 import { ModuleConfigurationService } from '@fsarch/server/configuration';
+import { Span } from '@fsarch/server/tracing';
 import { ConfigWorkersType } from "../../../types/config.type.js";
 import { WorkerBootstrapService, WorkerConfigSnapshot } from '../worker-bootstrap.service.js';
 
@@ -56,6 +57,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
     }
   }
 
+  @Span()
   private async syncAndBroadcastConfig(force: boolean): Promise<void> {
     if (this.clients.size === 0 && !force) {
       return;
@@ -124,6 +126,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
   }
 
   @SubscribeMessage('bootstrap')
+  @Span()
   async handleMessage(client: any, payload: { id: string }): Promise<WebSocketResponseMessage<{
     version: number;
     checksum: string;

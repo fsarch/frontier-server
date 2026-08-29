@@ -2,6 +2,7 @@ import { FunctionClient } from './function-client.js';
 import { CompiledHooks } from './compiled-config.js';
 import type { RequestType } from '../types/http/request.type.js';
 import type { ResponseType } from '../types/http/response.type.js';
+import { withSpan } from '../tracing/tracing.js';
 
 export type PreHookExecutionResult = {
   modifiedRequest: RequestType;
@@ -53,10 +54,15 @@ export async function executePreHooks(
   console.debug(`[worker][hooks] executing pre-hooks for route=${routePathRuleId}, hookCount=${preHooks.functions.length}`);
 
   try {
-    const preHookResult = await functionClient.executePreHooks(
-      preHooks,
-      clientRequestData,
-      upstreamRequestData,
+    const preHookResult = await withSpan(
+      'frontier-worker.preHooks',
+      () => functionClient.executePreHooks(preHooks, clientRequestData, upstreamRequestData),
+      {
+        attributes: {
+          'frontier.path_rule_id': routePathRuleId,
+          'frontier.hook_count': preHooks.functions.length,
+        },
+      },
     );
     return {
       modifiedRequest: preHookResult.modifiedRequest,
@@ -113,11 +119,15 @@ export async function executePostHooks(
   console.debug(`[worker][hooks] executing post-hooks for route=${routePathRuleId}, hookCount=${postHooks.functions.length}`);
 
   try {
-    const finalResponse = await functionClient.executePostHooks(
-      postHooks,
-      clientRequestData,
-      upstreamRequestData,
-      upstreamResponseData,
+    const finalResponse = await withSpan(
+      'frontier-worker.postHooks',
+      () => functionClient.executePostHooks(postHooks, clientRequestData, upstreamRequestData, upstreamResponseData),
+      {
+        attributes: {
+          'frontier.path_rule_id': routePathRuleId,
+          'frontier.hook_count': postHooks.functions.length,
+        },
+      },
     );
     return finalResponse;
   } catch (error) {
