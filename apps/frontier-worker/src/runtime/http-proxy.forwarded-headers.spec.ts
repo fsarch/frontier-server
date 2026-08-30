@@ -1,5 +1,5 @@
 import type { IncomingHttpHeaders } from 'http';
-import { appendForwardedHeaders } from './http-proxy.server.js';
+import { appendForwardedHeaders, buildRequestHeaders } from './http-proxy.server.js';
 
 describe('appendForwardedHeaders', () => {
   it('sets x-forwarded headers when none are present', () => {
@@ -50,6 +50,24 @@ describe('appendForwardedHeaders', () => {
     appendForwardedHeaders(upstreamHeaders, incomingHeaders, '[::1]:9090', '/v1', false);
 
     expect(upstreamHeaders['x-forwarded-port']).toBe('9090');
+  });
+});
+
+describe('buildRequestHeaders', () => {
+  it('strips incoming W3C trace-context/baggage headers so only the instrumentation-injected ones reach the upstream', () => {
+    const headers: IncomingHttpHeaders = {
+      'x-custom': 'keep-me',
+      traceparent: '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01',
+      tracestate: 'vendor=value',
+      baggage: 'key=value',
+    };
+
+    const result = buildRequestHeaders(headers);
+
+    expect(result['x-custom']).toBe('keep-me');
+    expect(result.traceparent).toBeUndefined();
+    expect(result.tracestate).toBeUndefined();
+    expect(result.baggage).toBeUndefined();
   });
 });
 

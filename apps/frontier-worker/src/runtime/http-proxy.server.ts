@@ -68,6 +68,14 @@ const HOP_BY_HOP_HEADERS = new Set([
   'content-length',
 ]);
 
+// W3C trace-context/baggage headers a client may have sent - these must never be forwarded
+// as-is. `UndiciInstrumentation` injects its own `traceparent` (linked to the span for this
+// worker's upstream call, itself a child of the incoming request's trace) when the outgoing
+// fetch happens; `undici`'s Request#addHeader does not dedupe, so if the client's original
+// header is still present it ends up sent to the upstream as a *second*, stale `traceparent`
+// line rather than being replaced - breaking trace propagation instead of continuing it.
+const TRACE_CONTEXT_HEADERS = new Set(['traceparent', 'tracestate', 'baggage']);
+
 const INSECURE_TLS_DISPATCHER = new UndiciAgent({
   connect: {
     rejectUnauthorized: false,
@@ -631,11 +639,12 @@ export class HttpProxyServer {
   }
 }
 
-function buildRequestHeaders(headers: IncomingHttpHeaders): Record<string, string> {
+export function buildRequestHeaders(headers: IncomingHttpHeaders): Record<string, string> {
   const result: Record<string, string> = {};
 
   for (const [name, value] of Object.entries(headers)) {
-    if (!value || name === 'host' || HOP_BY_HOP_HEADERS.has(name.toLowerCase())) {
+    const lowerName = name.toLowerCase();
+    if (!value || lowerName === 'host' || HOP_BY_HOP_HEADERS.has(lowerName) || TRACE_CONTEXT_HEADERS.has(lowerName)) {
       continue;
     }
 
