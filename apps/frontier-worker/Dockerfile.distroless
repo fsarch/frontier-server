@@ -1,3 +1,9 @@
+# Distroless variant - no shell/package manager, smaller attack surface
+# (most of the plain Dockerfile's OS-level CVEs come from tools this app
+# never runs at all: perl, util-linux, login, mount, ...). Same
+# build/runtime stages as ./Dockerfile otherwise - see that file for the
+# reasoning behind the node-gyp install.
+
 # syntax=docker/dockerfile:1
 
 FROM node:24.20.0-trixie-slim AS base
@@ -35,16 +41,21 @@ COPY apps/frontier-worker ./apps/frontier-worker
 RUN pnpm --filter ./apps/frontier-worker run build
 
 
-FROM base
+FROM gcr.io/distroless/nodejs24-debian13:nonroot
 
 ENV NODE_ENV=production
 ENV FRONTIER_WORKER_PORT=8080
 
+WORKDIR /usr/src/app
+
 EXPOSE 8080
 
-COPY --from=deps /usr/src/app ./
-COPY --from=builder /usr/src/app/apps/frontier-worker/dist ./apps/frontier-worker/dist
+COPY --from=deps --chown=nonroot:nonroot /usr/src/app ./
+COPY --from=builder --chown=nonroot:nonroot /usr/src/app/apps/frontier-worker/dist ./apps/frontier-worker/dist
 
 WORKDIR /usr/src/app/apps/frontier-worker
 
-CMD ["node", "--import", "./dist/tracing/register.js", "dist/main"]
+# distroless/nodejs's ENTRYPOINT is already the node binary - CMD is just
+# its argv, no "node" prefix (and no USER - the :nonroot tag already runs
+# as the built-in nonroot user).
+CMD ["--import", "./dist/tracing/register.js", "dist/main"]

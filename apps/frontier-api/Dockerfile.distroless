@@ -1,0 +1,63 @@
+# Distroless variant - no shell/package manager, smaller attack surface
+# (most of the plain Dockerfile's OS-level CVEs come from tools this app
+# never runs at all: perl, util-linux, login, mount, ...). Same
+# build/runtime stages as ./Dockerfile otherwise - see that file for the
+# reasoning behind the node-gyp install.
+
+# syntax=docker/dockerfile:1
+
+FROM node:24.20.0-trixie-slim AS base
+
+RUN corepack enable
+
+WORKDIR /usr/src/app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/frontier-api/package.json ./apps/frontier-api/
+COPY apps/frontier-worker/package.json ./apps/frontier-worker/
+
+
+FROM base AS deps
+
+ENV NODE_ENV=production
+
+RUN apt-get update && \
+    apt-get install -y node-gyp && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+RUN pnpm install --filter ./apps/frontier-api --frozen-lockfile --prod
+
+
+FROM base AS builder
+
+RUN apt-get update && \
+    apt-get install -y node-gyp && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+RUN pnpm install --filter ./apps/frontier-api --frozen-lockfile
+
+COPY apps/frontier-api ./apps/frontier-api
+
+RUN pnpm --filter ./apps/frontier-api run build
+
+
+FROM gcr.io/distroless/nodejs24-debian13:nonroot
+
+ENV NODE_ENV=production
+ENV PORT=8080
+
+WORKDIR /usr/src/app
+
+EXPOSE 8080
+
+COPY --from=deps --chown=nonroot:nonroot /usr/src/app ./
+COPY --from=builder --chown=nonroot:nonroot /usr/src/app/apps/frontier-api/dist ./apps/frontier-api/dist
+COPY --from=builder --chown=nonroot:nonroot /usr/src/app/apps/frontier-api/config ./apps/frontier-api/config
+
+WORKDIR /usr/src/app/apps/frontier-api
+
+# distroless/nodejs's ENTRYPOINT is already the node binary - CMD is just
+# its argv, no "node" prefix (and no USER - the :nonroot tag already runs
+# as the built-in nonroot user). See ./Dockerfile's CMD for why
+# --import @fsarch/server/register is needed.
+CMD ["--import", "@fsarch/server/register", "dist/main"]

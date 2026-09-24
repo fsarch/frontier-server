@@ -2,10 +2,13 @@
 
 FROM node:24.20.0-trixie-slim AS base
 
+RUN corepack enable
+
 WORKDIR /usr/src/app
 
-COPY package*.json ./
-COPY apps/frontier-api/package*.json ./apps/frontier-api/
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/frontier-api/package.json ./apps/frontier-api/
+COPY apps/frontier-worker/package.json ./apps/frontier-worker/
 
 
 FROM base AS deps
@@ -16,7 +19,7 @@ RUN apt-get update && \
     apt-get install -y node-gyp && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-RUN npm ci --fetch-timeout=300000 --workspace apps/frontier-api --include-workspace-root=false
+RUN pnpm install --filter ./apps/frontier-api --frozen-lockfile --prod
 
 
 FROM base AS builder
@@ -25,11 +28,11 @@ RUN apt-get update && \
     apt-get install -y node-gyp && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-RUN npm ci --fetch-timeout=300000 --workspace apps/frontier-api --include-workspace-root=false
+RUN pnpm install --filter ./apps/frontier-api --frozen-lockfile
 
 COPY apps/frontier-api ./apps/frontier-api
 
-RUN npm --workspace apps/frontier-api run build
+RUN pnpm --filter ./apps/frontier-api run build
 
 
 FROM base

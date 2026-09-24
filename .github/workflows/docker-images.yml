@@ -37,8 +37,10 @@ jobs:
           # fsarch/helm-charts for why).
           - image: frontier-server
             dockerfile: apps/frontier-api/Dockerfile
+            dockerfile_distroless: apps/frontier-api/Dockerfile.distroless
           - image: frontier-worker
             dockerfile: apps/frontier-worker/Dockerfile
+            dockerfile_distroless: apps/frontier-worker/Dockerfile.distroless
 
     steps:
       - name: checkout code
@@ -90,6 +92,13 @@ jobs:
             echo "stable=false" >> "$GITHUB_OUTPUT"
           fi
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          # Same tags, "-distroless" suffixed, for the Dockerfile.distroless
+          # build below (e.g. fsarch/frontier-server:1.2.3-distroless).
+          DISTROLESS_TAGS=""
+          for tag in ${TAGS}; do
+            DISTROLESS_TAGS="${DISTROLESS_TAGS} ${tag}-distroless"
+          done
+          echo "distroless_tags=${DISTROLESS_TAGS}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push ${{ matrix.image }}
         run: |
@@ -101,6 +110,23 @@ jobs:
           docker buildx build \
             ${TAG_ARGS} \
             --file ${{ matrix.dockerfile }} \
+            --platform linux/amd64,linux/arm64 \
+            --push .
+
+      - name: Build and push ${{ matrix.image }} (distroless)
+        # Only for tagged releases, not every push to main (no
+        # ":latest-distroless" counterpart - avoids doubling the build for
+        # the mainline "just verify it still builds/pushes" case).
+        if: startsWith(github.event.workflow_run.head_branch, 'v')
+        run: |
+          TAG_ARGS=""
+          for tag in ${{ steps.image.outputs.distroless_tags }}; do
+            TAG_ARGS="${TAG_ARGS} --tag ${tag}"
+          done
+
+          docker buildx build \
+            ${TAG_ARGS} \
+            --file ${{ matrix.dockerfile_distroless }} \
             --platform linux/amd64,linux/arm64 \
             --push .
 
