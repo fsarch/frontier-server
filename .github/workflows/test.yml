@@ -32,14 +32,6 @@ jobs:
           node-version: 24.x
           cache: 'pnpm'
 
-      - name: Configure npm for GitHub Packages (fsarch scope)
-        # Configure registry only for the @fsarch scope and write auth token
-        run: |
-          echo "@fsarch:registry=https://npm.pkg.github.com" >> ~/.npmrc
-          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
