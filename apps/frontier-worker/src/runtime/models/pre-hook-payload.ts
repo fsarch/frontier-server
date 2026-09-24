@@ -1,5 +1,5 @@
-import { HookPayload } from './hook-payload.js';
 import type { RequestType } from '../../types/http/request.type.js';
+import { HookPayload } from './hook-payload.js';
 
 export interface PreHookPayloadData {
   clientRequest: RequestType;

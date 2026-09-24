@@ -1,11 +1,20 @@
+import { Span } from '@fsarch/server/tracing';
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Between, FindOptionsSelect, FindOptionsWhere, LessThan, MoreThan, Repository } from 'typeorm';
-import { RequestLog } from '../../../database/entities/request-log.entity.js';
-import { RequestLogQueryDto, WorkerRequestLogCreateDto } from '../../../models/request-log.model.js';
+import { InjectRepository } from '@nestjs/typeorm';
+import {
+  Between,
+  FindOptionsWhere,
+  LessThan,
+  MoreThan,
+  Repository,
+} from 'typeorm';
 import { LogPolicy } from '../../../database/entities/log-policy.entity.js';
-import { Span } from "@fsarch/server/tracing";
+import { RequestLog } from '../../../database/entities/request-log.entity.js';
+import {
+  RequestLogQueryDto,
+  WorkerRequestLogCreateDto,
+} from '../../../models/request-log.model.js';
 
 @Injectable()
 export class RequestLogService {
@@ -14,12 +23,13 @@ export class RequestLogService {
     private readonly requestLogRepository: Repository<RequestLog>,
     @InjectRepository(LogPolicy)
     private readonly logPolicyRepository: Repository<LogPolicy>,
-  ) {
-  }
+  ) {}
 
-  public async Create(createDto: WorkerRequestLogCreateDto): Promise<{ id: string }> {
+  public async Create(
+    createDto: WorkerRequestLogCreateDto,
+  ): Promise<{ id: string }> {
     const retentionSec = await this.getRetentionSeconds(createDto.logPolicyId);
-    const expirationTime = new Date(Date.now() + (retentionSec * 1000));
+    const expirationTime = new Date(Date.now() + retentionSec * 1000);
 
     const createdLog = this.requestLogRepository.create({
       id: crypto.randomUUID(),
@@ -44,7 +54,10 @@ export class RequestLogService {
     };
   }
 
-  public async ListByDomainGroupId(domainGroupId: string, query: RequestLogQueryDto): Promise<RequestLog[]> {
+  public async ListByDomainGroupId(
+    domainGroupId: string,
+    query: RequestLogQueryDto,
+  ): Promise<RequestLog[]> {
     const where: FindOptionsWhere<RequestLog> = {
       domainGroupId,
     };
@@ -105,7 +118,10 @@ export class RequestLogService {
       return 604800;
     }
 
-    const retention = parseInt(logPolicy.retentionTimeSeconds as unknown as string, 10);
+    const retention = parseInt(
+      logPolicy.retentionTimeSeconds as unknown as string,
+      10,
+    );
     if (!retention || retention <= 0) {
       return 604800;
     }
@@ -123,7 +139,12 @@ function parseDate(value: string | undefined): Date | undefined {
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }
 
-function parsePositiveInt(raw: string | undefined, fallback: number, min: number, max: number): number {
+function parsePositiveInt(
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
   if (!raw) {
     return fallback;
   }
@@ -135,4 +156,3 @@ function parsePositiveInt(raw: string | undefined, fallback: number, min: number
 
   return Math.min(max, Math.max(min, parsed));
 }
-

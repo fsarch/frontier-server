@@ -1,10 +1,24 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { AuthGuard } from '@fsarch/server/auth';
 import { Roles } from '@fsarch/server/uac';
-import { HookService } from "./hook.service.js";
-import { HookCreateDto, HookDto, HookUpdateDto } from "../../models/hook.model.js";
-import { Role } from "../../constants/role.enum.js";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Role } from '../../constants/role.enum.js';
+import {
+  HookCreateDto,
+  HookDto,
+  HookUpdateDto,
+} from '../../models/hook.model.js';
+import { HookService } from './hook.service.js';
 
 @ApiTags('hooks')
 @Controller({
@@ -13,17 +27,12 @@ import { Role } from "../../constants/role.enum.js";
 })
 @ApiBearerAuth()
 export class HookController {
-  constructor(
-    private readonly hookService: HookService,
-  ) {
-  }
+  constructor(private readonly hookService: HookService) {}
 
   @Post()
   @UseGuards(AuthGuard)
   @Roles(Role.manage)
-  public async Create(
-    @Body() hookCreateDto: HookCreateDto,
-  ) {
+  public async Create(@Body() hookCreateDto: HookCreateDto) {
     const result = await this.hookService.Create(hookCreateDto);
     return HookDto.FromDbo({ ...hookCreateDto, ...result });
   }
@@ -39,9 +48,7 @@ export class HookController {
   @Get(':id')
   @UseGuards(AuthGuard)
   @Roles(Role.manage)
-  public async GetById(
-    @Param('id') id: string,
-  ) {
+  public async GetById(@Param('id') id: string) {
     const hook = await this.hookService.GetById(id);
     return HookDto.FromDbo(hook);
   }
@@ -61,9 +68,7 @@ export class HookController {
   @HttpCode(204)
   @UseGuards(AuthGuard)
   @Roles(Role.manage)
-  public async Delete(
-    @Param('id') id: string,
-  ) {
+  public async Delete(@Param('id') id: string) {
     await this.hookService.Delete(id);
   }
 }

@@ -1,27 +1,39 @@
-import { createServer, IncomingHttpHeaders, IncomingMessage, Server, ServerResponse } from 'http';
-import { gunzip as zlibGunzip } from 'zlib';
-import { promisify } from 'util';
-import { Agent as UndiciAgent, type RequestInit, type Response, fetch } from 'undici';
+import {
+  createServer,
+  IncomingHttpHeaders,
+  IncomingMessage,
+  Server,
+  ServerResponse,
+} from 'node:http';
+import { promisify } from 'node:util';
+import { gunzip as zlibGunzip } from 'node:zlib';
 import { trace } from '@opentelemetry/api';
+import {
+  fetch,
+  type RequestInit,
+  type Response,
+  Agent as UndiciAgent,
+} from 'undici';
 import { withSpan } from '../tracing/tracing.js';
 
 const gunzipAsync = promisify(zlibGunzip);
-import { buildUpstreamPath, CompiledWorkerConfig } from './compiled-config.js';
-import { WorkerConfigSnapshot } from '../types/worker-config.types.js';
+
 import type { RequestType } from '../types/http/request.type.js';
 import type { ResponseType } from '../types/http/response.type.js';
 import type { BodyType } from '../types/http/shared.type.js';
-import { FunctionClient, FunctionServerConfig } from './function-client.js';
+import { WorkerConfigSnapshot } from '../types/worker-config.types.js';
 import { BodyUtils } from '../utils/http/body.utils.js';
+import { HeadersUtils } from '../utils/http/index.js';
+import { buildUpstreamPath, CompiledWorkerConfig } from './compiled-config.js';
+import { FunctionClient, FunctionServerConfig } from './function-client.js';
+import { executePostHooks, executePreHooks } from './function-hooks.js';
+import { buildCacheResponse } from './hooks/cache.hook.js';
 import { compressResponseBody } from './hooks/compression.hook.js';
 import {
-  executePreHooks,
-  executePostHooks,
-} from './function-hooks.js';
-import { HeadersUtils } from "../utils/http/index.js";
+  buildCorsHeadersForHttp,
+  buildCorsResponse,
+} from './hooks/cors.hook.js';
 import { PostHookPayload } from './models/post-hook-payload.js';
-import { buildCorsResponse, getOriginFromRequest, buildCorsHeadersForHttp } from './hooks/cors.hook.js';
-import { buildCacheResponse } from "./hooks/cache.hook.js";
 
 type Metrics = {
   startedAt: number;
@@ -89,7 +101,9 @@ export class HttpProxyServer {
     totalRequests: 0,
     totalErrors: 0,
   };
-  private readonly debugEnabled = isDebugEnabled(process.env.FRONTIER_WORKER_DEBUG);
+  private readonly debugEnabled = isDebugEnabled(
+    process.env.FRONTIER_WORKER_DEBUG,
+  );
 
   private activeConfig: CompiledWorkerConfig | null = null;
   private activeVersion = 0;
@@ -112,7 +126,10 @@ export class HttpProxyServer {
   }
 
   public setSnapshot(version: number, snapshot: WorkerConfigSnapshot) {
-    this.activeConfig = new CompiledWorkerConfig(snapshot, this.functionConfigs);
+    this.activeConfig = new CompiledWorkerConfig(
+      snapshot,
+      this.functionConfigs,
+    );
     this.activeVersion = version;
 
     if (!this.hasPrintedInitialRoutes) {
@@ -122,7 +139,6 @@ export class HttpProxyServer {
 
     this.debug(`applied snapshot version=${version}`);
   }
-
 
   public getMetrics() {
     const uptimeMs = Date.now() - this.metrics.startedAt;
@@ -170,15 +186,22 @@ export class HttpProxyServer {
 
     try {
       const method = req.method ?? 'GET';
-      const requestUrl = new URL(req.url ?? '/', 'http://frontier-worker.local');
+      const requestUrl = new URL(
+        req.url ?? '/',
+        'http://frontier-worker.local',
+      );
       const hostHeader = req.headers.host;
       incomingMethod = method;
       incomingUrl = buildIncomingUrl(hostHeader, requestUrl);
 
-      this.debug(`incoming request method=${method} host=${hostHeader ?? '<missing>'} path=${requestUrl.pathname}${requestUrl.search} activeConfigVersion=${this.activeVersion}`);
+      this.debug(
+        `incoming request method=${method} host=${hostHeader ?? '<missing>'} path=${requestUrl.pathname}${requestUrl.search} activeConfigVersion=${this.activeVersion}`,
+      );
 
       if (!this.activeConfig) {
-        this.debug('rejecting request because no active configuration is loaded');
+        this.debug(
+          'rejecting request because no active configuration is loaded',
+        );
         res.writeHead(503).end('worker has no active configuration');
         return;
       }
@@ -186,16 +209,26 @@ export class HttpProxyServer {
       const route = withSpan(
         'frontier-worker.resolveRoute',
         (span) => {
-          const resolved = this.activeConfig!.resolve(hostHeader, requestUrl.pathname);
+          const resolved = this.activeConfig?.resolve(
+            hostHeader,
+            requestUrl.pathname,
+          );
           span.setAttribute('frontier.route_found', resolved !== null);
           return resolved;
         },
-        { attributes: { 'frontier.host': hostHeader ?? '<missing>', 'frontier.path': requestUrl.pathname } },
+        {
+          attributes: {
+            'frontier.host': hostHeader ?? '<missing>',
+            'frontier.path': requestUrl.pathname,
+          },
+        },
       );
       resolvedRoute = route;
 
       if (!route) {
-        this.debug(`no route match for host=${hostHeader ?? '<missing>'} path=${requestUrl.pathname}`);
+        this.debug(
+          `no route match for host=${hostHeader ?? '<missing>'} path=${requestUrl.pathname}`,
+        );
         res.writeHead(404).end('no route for request');
         return;
       }
@@ -207,10 +240,20 @@ export class HttpProxyServer {
         'frontier.path_rule_id': route.pathRuleId,
       });
 
-      const upstreamPath = buildUpstreamPath(route.upstream.basePath, route.pathPrefix, requestUrl.pathname);
+      const upstreamPath = buildUpstreamPath(
+        route.upstream.basePath,
+        route.pathPrefix,
+        requestUrl.pathname,
+      );
       upstreamUrl = `${route.upstream.protocol}://${route.upstream.host}:${route.upstream.port}${upstreamPath}${requestUrl.search}`;
       upstreamHeaders = buildRequestHeaders(req.headers);
-      appendForwardedHeaders(upstreamHeaders, req.headers, hostHeader, route.pathPrefix, 'encrypted' in req.socket && req.socket.encrypted === true);
+      appendForwardedHeaders(
+        upstreamHeaders,
+        req.headers,
+        hostHeader,
+        route.pathPrefix,
+        'encrypted' in req.socket && req.socket.encrypted === true,
+      );
       const requestOrigin = getSingleHeaderValue(req.headers.origin);
       upstreamMethod = method;
 
@@ -230,8 +273,14 @@ export class HttpProxyServer {
           return;
         }
 
-        const preflightHeaders = buildCorsHeadersForHttp(route.cors, requestOrigin, req.headers['access-control-request-headers']);
-        this.debug(`cors preflight accepted origin=${requestOrigin} path=${requestUrl.pathname}`);
+        const preflightHeaders = buildCorsHeadersForHttp(
+          route.cors,
+          requestOrigin,
+          req.headers['access-control-request-headers'],
+        );
+        this.debug(
+          `cors preflight accepted origin=${requestOrigin} path=${requestUrl.pathname}`,
+        );
         res.writeHead(204, preflightHeaders).end();
         await this.reportRequestLog(route, {
           incomingMethod: method,
@@ -246,8 +295,14 @@ export class HttpProxyServer {
         return;
       }
 
-      if (route.cors.enabled && requestOrigin && !isCorsOriginAllowed(route.cors, requestOrigin)) {
-        this.debug(`cors rejected origin=${requestOrigin} path=${requestUrl.pathname}`);
+      if (
+        route.cors.enabled &&
+        requestOrigin &&
+        !isCorsOriginAllowed(route.cors, requestOrigin)
+      ) {
+        this.debug(
+          `cors rejected origin=${requestOrigin} path=${requestUrl.pathname}`,
+        );
         res.writeHead(403).end('cors origin is not allowed');
         await this.reportRequestLog(route, {
           incomingMethod: method,
@@ -262,7 +317,9 @@ export class HttpProxyServer {
         return;
       }
 
-      this.debug(`resolved request host=${hostHeader ?? '<missing>'} path=${requestUrl.pathname} routePrefix=${route.pathPrefix} upstream=${upstreamUrl}`);
+      this.debug(
+        `resolved request host=${hostHeader ?? '<missing>'} path=${requestUrl.pathname} routePrefix=${route.pathPrefix} upstream=${upstreamUrl}`,
+      );
       this.debug(`upstream request method=${method} url=${upstreamUrl}`);
 
       // Only buffer the request body up-front when a pre-hook is actually going to run on this
@@ -271,20 +328,38 @@ export class HttpProxyServer {
       // which avoids holding large uploads (e.g. file uploads) fully in memory before forwarding
       // a single byte.
       const skipBody = method === 'GET' || method === 'HEAD';
-      const preHooksActive = route.preHooks.enabled && this.functionClient !== null && !skipBody;
-      const requestBodyBytes = preHooksActive ? await this.readRequestBody(req) : undefined;
+      const preHooksActive =
+        route.preHooks.enabled && this.functionClient !== null && !skipBody;
+      const requestBodyBytes = preHooksActive
+        ? await this.readRequestBody(req)
+        : undefined;
 
       // Interpret the buffered bytes based on the declared Content-Type: JSON stays a parsed
       // object (type: 'json'), text/* stays a decoded string (type: 'text'), everything else -
       // including any content whose declared type turns out to be a lie - is handed to the hook
       // as raw bytes (type: 'binary.uint8array') instead of being guessed at.
       const requestBodyForHooks = preHooksActive
-        ? decodeRequestBodyForHooks(requestBodyBytes, req.headers['content-type'])
+        ? decodeRequestBodyForHooks(
+            requestBodyBytes,
+            req.headers['content-type'],
+          )
         : null;
 
       // Prepare hook request data
-      const clientRequestData = buildRequestType(method, incomingUrl, req.headers, requestBodyForHooks, true);
-      const hookRequestData = buildRequestType(method, upstreamUrl, upstreamHeaders, requestBodyForHooks, false);
+      const clientRequestData = buildRequestType(
+        method,
+        incomingUrl,
+        req.headers,
+        requestBodyForHooks,
+        true,
+      );
+      const hookRequestData = buildRequestType(
+        method,
+        upstreamUrl,
+        upstreamHeaders,
+        requestBodyForHooks,
+        false,
+      );
 
       // Execute pre-hooks if available
       const preHookResult = await executePreHooks(
@@ -298,10 +373,12 @@ export class HttpProxyServer {
 
       // Check if pre-hook execution failed
       if (preHookResult.error === true) {
-        res.writeHead(preHookResult.statusCode, {
-          'content-type': 'application/json',
-          'x-error': 'pre-hook failed',
-        }).end(JSON.stringify({ error: preHookResult.message }));
+        res
+          .writeHead(preHookResult.statusCode, {
+            'content-type': 'application/json',
+            'x-error': 'pre-hook failed',
+          })
+          .end(JSON.stringify({ error: preHookResult.message }));
 
         await this.reportRequestLog(route, {
           incomingMethod: method,
@@ -316,15 +393,20 @@ export class HttpProxyServer {
         return;
       }
 
-      let modifiedRequest = preHookResult.modifiedRequest;
+      const modifiedRequest = preHookResult.modifiedRequest;
       const shortCircuitResponse = preHookResult.shortCircuitResponse;
 
       // If pre-hook returned a short-circuit response, send it directly
       if (shortCircuitResponse) {
-        this.debug(`short-circuit response from pre-hook, status=${shortCircuitResponse.statusCode}`);
+        this.debug(
+          `short-circuit response from pre-hook, status=${shortCircuitResponse.statusCode}`,
+        );
         const responseHeaders = { ...shortCircuitResponse.headers };
         if (route.cors.enabled && requestOrigin) {
-          Object.assign(responseHeaders, buildCorsHeadersForHttp(route.cors, requestOrigin));
+          Object.assign(
+            responseHeaders,
+            buildCorsHeadersForHttp(route.cors, requestOrigin),
+          );
         }
         if (shortCircuitResponse.statusText) {
           res.statusMessage = shortCircuitResponse.statusText;
@@ -346,7 +428,9 @@ export class HttpProxyServer {
       }
 
       // Execute upstream request with potentially modified request data
-      console.log(`[worker][upstream] request: method=${modifiedRequest.method} url=${upstreamUrl}`);
+      console.log(
+        `[worker][upstream] request: method=${modifiedRequest.method} url=${upstreamUrl}`,
+      );
       const upstreamRequestOptions = requestTypeToProxyRequest(modifiedRequest);
       const upstreamFetchOptions: RequestInit = {
         method: upstreamRequestOptions.method,
@@ -366,8 +450,13 @@ export class HttpProxyServer {
         upstreamFetchOptions.duplex = 'half';
       }
 
-      if (route.upstream.protocol === 'https' && route.upstream.sslVerify === false) {
-        this.debug(`ssl verification disabled for upstream ${route.upstream.host}:${route.upstream.port}`);
+      if (
+        route.upstream.protocol === 'https' &&
+        route.upstream.sslVerify === false
+      ) {
+        this.debug(
+          `ssl verification disabled for upstream ${route.upstream.host}:${route.upstream.port}`,
+        );
       }
       const upstreamRes = await withSpan(
         'frontier-worker.forwardToUpstream',
@@ -375,7 +464,8 @@ export class HttpProxyServer {
           const res = await fetchWithOptionalInsecureTls(
             upstreamUrl,
             upstreamFetchOptions,
-            route.upstream.protocol === 'https' && route.upstream.sslVerify === false,
+            route.upstream.protocol === 'https' &&
+              route.upstream.sslVerify === false,
           );
           span.setAttribute('http.status_code', res.status);
           return res;
@@ -388,7 +478,9 @@ export class HttpProxyServer {
           },
         },
       );
-      console.log(`[worker][upstream] response: method=${modifiedRequest.method} url=${upstreamUrl} status=${upstreamRes.status}`);
+      console.log(
+        `[worker][upstream] response: method=${modifiedRequest.method} url=${upstreamUrl} status=${upstreamRes.status}`,
+      );
 
       // Read upstream response body as buffer (not text - in case it's compressed)
       let upstreamResponseBody: unknown;
@@ -396,17 +488,22 @@ export class HttpProxyServer {
       const hasBody = responseBuffer.byteLength > 0;
 
       // If upstream response is gzip-compressed, decompress it first
-      const upstreamContentEncoding = getSingleHeaderValue(upstreamRes.headers['content-encoding']);
-      const isUpstreamGzipped = upstreamContentEncoding && upstreamContentEncoding.includes('gzip');
+      const upstreamContentEncoding = getSingleHeaderValue(
+        upstreamRes.headers['content-encoding'],
+      );
+      const isUpstreamGzipped = upstreamContentEncoding?.includes('gzip');
 
       let bodyBuffer = Buffer.from(responseBuffer as any);
       if (isUpstreamGzipped) {
         this.debug(`upstream response is gzip-compressed, decompressing`);
         try {
-          bodyBuffer = await gunzipAsync(bodyBuffer) as any;
+          bodyBuffer = (await gunzipAsync(bodyBuffer)) as any;
         } catch (e) {
           this.debug(`failed to decompress upstream response: ${e}`);
-          console.error('[worker][upstream] failed to decompress gzip response:', e);
+          console.error(
+            '[worker][upstream] failed to decompress gzip response:',
+            e,
+          );
         }
       }
 
@@ -481,12 +578,18 @@ export class HttpProxyServer {
       response = buildCacheResponse(cachePayload, route.cachePolicy);
       // endregion
 
-      this.debug(`upstream response status=${response.statusCode} upstream=${upstreamUrl}`);
+      this.debug(
+        `upstream response status=${response.statusCode} upstream=${upstreamUrl}`,
+      );
 
       // Check if client accepts gzip encoding
-      const acceptEncoding = getSingleHeaderValue(req.headers['accept-encoding']);
+      const acceptEncoding = getSingleHeaderValue(
+        req.headers['accept-encoding'],
+      );
       const supportsGzip = acceptsEncoding(acceptEncoding, 'gzip');
-      this.debug(`client accepts gzip: ${supportsGzip} (accept-encoding: ${acceptEncoding})`);
+      this.debug(
+        `client accepts gzip: ${supportsGzip} (accept-encoding: ${acceptEncoding})`,
+      );
 
       if (response.body) {
         // Create compression payload with CORS response
@@ -509,13 +612,21 @@ export class HttpProxyServer {
         }
 
         // Apply compression with the compression payload
-        const compressedResponse = await compressResponseBody(compressionPayload, {
-          supportsGzip,
-          onDebug: (msg) => this.debug(msg),
-        });
+        const compressedResponse = await compressResponseBody(
+          compressionPayload,
+          {
+            supportsGzip,
+            onDebug: (msg) => this.debug(msg),
+          },
+        );
 
-        res.writeHead(compressedResponse.statusCode, compressedResponse.headers);
-        res.end(BodyUtils.plainObjectToBody(compressedResponse.body) ?? undefined);
+        res.writeHead(
+          compressedResponse.statusCode,
+          compressedResponse.headers,
+        );
+        res.end(
+          BodyUtils.plainObjectToBody(compressedResponse.body) ?? undefined,
+        );
       } else {
         if (response.statusText) {
           res.statusMessage = response.statusText;
@@ -562,9 +673,16 @@ export class HttpProxyServer {
 
   private async reportRequestLog(
     route: ReturnType<CompiledWorkerConfig['resolve']>,
-    payload: Omit<RequestLogPayload, 'domainGroupId' | 'pathRuleId' | 'logPolicyId'>,
+    payload: Omit<
+      RequestLogPayload,
+      'domainGroupId' | 'pathRuleId' | 'logPolicyId'
+    >,
   ) {
-    if (!route || !route.log.enabled || !route.log.logPolicyId || !this.options?.onRequestLog) {
+    if (
+      !route?.log.enabled ||
+      !route.log.logPolicyId ||
+      !this.options?.onRequestLog
+    ) {
       return;
     }
 
@@ -599,7 +717,9 @@ export class HttpProxyServer {
    * enabled for the route and therefore needs to inspect/transform the complete body - the
    * default request path streams the body straight through to the upstream without calling this.
    */
-  private async readRequestBody(req: IncomingMessage): Promise<Uint8Array | undefined> {
+  private async readRequestBody(
+    req: IncomingMessage,
+  ): Promise<Uint8Array | undefined> {
     return new Promise((resolve, reject) => {
       const chunks: Uint8Array[] = [];
 
@@ -620,7 +740,9 @@ export class HttpProxyServer {
 
   private printInitialRoutes(version: number, config: CompiledWorkerConfig) {
     const routes = config.describeRoutes();
-    console.log(`[worker][routes] initial route table loaded (configVersion=${version})`);
+    console.log(
+      `[worker][routes] initial route table loaded (configVersion=${version})`,
+    );
 
     if (routes.length === 0) {
       console.log('[worker][routes] no routes configured');
@@ -628,7 +750,8 @@ export class HttpProxyServer {
     }
 
     for (const route of routes) {
-      const hosts = route.domains.length > 0 ? route.domains : ['<no-domain-mapping>'];
+      const hosts =
+        route.domains.length > 0 ? route.domains : ['<no-domain-mapping>'];
 
       for (const host of hosts) {
         console.log(
@@ -639,17 +762,24 @@ export class HttpProxyServer {
   }
 }
 
-export function buildRequestHeaders(headers: IncomingHttpHeaders): Record<string, string> {
+export function buildRequestHeaders(
+  headers: IncomingHttpHeaders,
+): Record<string, string> {
   const result: Record<string, string> = {};
 
   for (const [name, value] of Object.entries(headers)) {
     const lowerName = name.toLowerCase();
-    if (!value || lowerName === 'host' || HOP_BY_HOP_HEADERS.has(lowerName) || TRACE_CONTEXT_HEADERS.has(lowerName)) {
+    if (
+      !value ||
+      lowerName === 'host' ||
+      HOP_BY_HOP_HEADERS.has(lowerName) ||
+      TRACE_CONTEXT_HEADERS.has(lowerName)
+    ) {
       continue;
     }
 
     // Validate header name
-    if (!/^[a-zA-Z0-9\-]+$/.test(name)) {
+    if (!/^[a-zA-Z0-9-]+$/.test(name)) {
       continue;
     }
 
@@ -673,15 +803,20 @@ export function appendForwardedHeaders(
 ) {
   const proto = resolveForwardedProto(incomingHeaders, isTlsRequest);
   const port = resolveForwardedPort(incomingHeaders, hostHeader, proto);
-  const prefix = normalizeForwardedPrefix(pathPrefix);
+  const _prefix = normalizeForwardedPrefix(pathPrefix);
 
   appendForwardedHeader(headers, 'x-forwarded-host', hostHeader);
   appendForwardedHeader(headers, 'x-forwarded-proto', proto);
   appendForwardedHeader(headers, 'x-forwarded-port', port);
 }
 
-function resolveForwardedProto(headers: IncomingHttpHeaders, isTlsRequest: boolean): string {
-  const forwardedProto = getFirstCommaSeparatedValue(getSingleHeaderValue(headers['x-forwarded-proto']));
+function resolveForwardedProto(
+  headers: IncomingHttpHeaders,
+  isTlsRequest: boolean,
+): string {
+  const forwardedProto = getFirstCommaSeparatedValue(
+    getSingleHeaderValue(headers['x-forwarded-proto']),
+  );
   if (forwardedProto === 'https' || forwardedProto === 'http') {
     return forwardedProto;
   }
@@ -694,7 +829,9 @@ function resolveForwardedPort(
   hostHeader: string | undefined,
   proto: string,
 ): string {
-  const forwardedPort = getFirstCommaSeparatedValue(getSingleHeaderValue(headers['x-forwarded-port']));
+  const forwardedPort = getFirstCommaSeparatedValue(
+    getSingleHeaderValue(headers['x-forwarded-port']),
+  );
   if (forwardedPort && /^[0-9]+$/.test(forwardedPort)) {
     return forwardedPort;
   }
@@ -707,7 +844,9 @@ function resolveForwardedPort(
   return proto === 'https' ? '443' : '80';
 }
 
-function parsePortFromHostHeader(hostHeader: string | undefined): number | undefined {
+function parsePortFromHostHeader(
+  hostHeader: string | undefined,
+): number | undefined {
   if (!hostHeader) {
     return undefined;
   }
@@ -720,12 +859,18 @@ function parsePortFromHostHeader(hostHeader: string | undefined): number | undef
   // IPv6 host header can be represented as "[::1]:8080".
   if (trimmed.startsWith('[')) {
     const closeBracketIndex = trimmed.indexOf(']');
-    if (closeBracketIndex < 0 || closeBracketIndex === trimmed.length - 1 || trimmed[closeBracketIndex + 1] !== ':') {
+    if (
+      closeBracketIndex < 0 ||
+      closeBracketIndex === trimmed.length - 1 ||
+      trimmed[closeBracketIndex + 1] !== ':'
+    ) {
       return undefined;
     }
 
     const portText = trimmed.slice(closeBracketIndex + 2);
-    return /^[0-9]+$/.test(portText) ? Number.parseInt(portText, 10) : undefined;
+    return /^[0-9]+$/.test(portText)
+      ? Number.parseInt(portText, 10)
+      : undefined;
   }
 
   const colonCount = (trimmed.match(/:/g) ?? []).length;
@@ -755,16 +900,23 @@ function normalizeForwardedPrefix(pathPrefix: string): string {
   return trimmed;
 }
 
-function appendForwardedHeader(headers: Record<string, string>, name: string, value: string | undefined) {
+function appendForwardedHeader(
+  headers: Record<string, string>,
+  name: string,
+  value: string | undefined,
+) {
   if (!value) {
     return;
   }
 
   const existing = headers[name];
-  headers[name] = existing && existing.length > 0 ? `${existing}, ${value}` : value;
+  headers[name] =
+    existing && existing.length > 0 ? `${existing}, ${value}` : value;
 }
 
-function getFirstCommaSeparatedValue(value: string | undefined): string | undefined {
+function getFirstCommaSeparatedValue(
+  value: string | undefined,
+): string | undefined {
   if (!value) {
     return undefined;
   }
@@ -796,7 +948,11 @@ function buildRequestType(
   const requestHeaders: RequestType['headers'] = {};
   for (const [name, value] of headerEntries) {
     const lowerName = name.toLowerCase();
-    if (!value || HOP_BY_HOP_HEADERS.has(lowerName) || !/^[a-zA-Z0-9\-]+$/.test(name)) {
+    if (
+      !value ||
+      HOP_BY_HOP_HEADERS.has(lowerName) ||
+      !/^[a-zA-Z0-9-]+$/.test(name)
+    ) {
       continue;
     }
 
@@ -825,8 +981,17 @@ function buildRequestType(
     url: {
       scheme: url.protocol.replace(':', ''),
       host: url.hostname,
-      path: url.pathname.endsWith('/') && url.pathname.length > 1 ? url.pathname.slice(0, -1) : (url.pathname || '/'),
-      port: url.port ? Number.parseInt(url.port, 10) : (url.protocol === 'https:' ? 443 : url.protocol === 'http:' ? 80 : 0),
+      path:
+        url.pathname.endsWith('/') && url.pathname.length > 1
+          ? url.pathname.slice(0, -1)
+          : url.pathname || '/',
+      port: url.port
+        ? Number.parseInt(url.port, 10)
+        : url.protocol === 'https:'
+          ? 443
+          : url.protocol === 'http:'
+            ? 80
+            : 0,
       query,
     },
     headers: requestHeaders,
@@ -849,11 +1014,16 @@ function decodeRequestBodyForHooks(
     return null;
   }
 
-  const contentType = extractContentType(getSingleHeaderValue(contentTypeHeader));
+  const contentType = extractContentType(
+    getSingleHeaderValue(contentTypeHeader),
+  );
 
   if (contentType === 'application/json' || contentType.endsWith('+json')) {
     try {
-      return { type: 'json', payload: JSON.parse(Buffer.from(bytes).toString('utf-8')) };
+      return {
+        type: 'json',
+        payload: JSON.parse(Buffer.from(bytes).toString('utf-8')),
+      };
     } catch {
       // Declared as JSON but not actually parseable - fall through to raw bytes below.
     }
@@ -861,7 +1031,10 @@ function decodeRequestBodyForHooks(
     return { type: 'text', payload: Buffer.from(bytes).toString('utf-8') };
   }
 
-  return { type: 'binary.uint8array', payload: Buffer.from(bytes).toString('base64') };
+  return {
+    type: 'binary.uint8array',
+    payload: Buffer.from(bytes).toString('base64'),
+  };
 }
 
 /**
@@ -884,7 +1057,7 @@ function requestTypeToProxyRequest(request: RequestType): {
   const headers: Record<string, string> = {};
 
   for (const [name, values] of Object.entries(request.headers)) {
-    if (!/^[a-zA-Z0-9\-]+$/.test(name) || values.length === 0) {
+    if (!/^[a-zA-Z0-9-]+$/.test(name) || values.length === 0) {
       continue;
     }
 
@@ -894,9 +1067,11 @@ function requestTypeToProxyRequest(request: RequestType): {
   const body = BodyUtils.plainObjectToBody(request.body);
 
   // For binary data, check byteLength; for string, check length
-  const hasBody = body ? (body instanceof Uint8Array
-    ? body.byteLength > 0
-    : body.length > 0) : null;
+  const hasBody = body
+    ? body instanceof Uint8Array
+      ? body.byteLength > 0
+      : body.length > 0
+    : null;
 
   return {
     method: request.method,
@@ -905,11 +1080,13 @@ function requestTypeToProxyRequest(request: RequestType): {
   };
 }
 
-function requestTypeHeadersToRecord(headers: RequestType['headers']): Record<string, string> {
+function requestTypeHeadersToRecord(
+  headers: RequestType['headers'],
+): Record<string, string> {
   const result: Record<string, string> = {};
 
   for (const [name, values] of Object.entries(headers)) {
-    if (!/^[a-zA-Z0-9\-]+$/.test(name) || values.length === 0) {
+    if (!/^[a-zA-Z0-9-]+$/.test(name) || values.length === 0) {
       continue;
     }
 
@@ -940,7 +1117,9 @@ async function fetchWithOptionalInsecureTls(
   return fetch(url, insecureOptions as RequestInit);
 }
 
-function getSingleHeaderValue(value: string | string[] | undefined): string | undefined {
+function getSingleHeaderValue(
+  value: string | string[] | undefined,
+): string | undefined {
   if (!value) {
     return undefined;
   }
@@ -948,23 +1127,28 @@ function getSingleHeaderValue(value: string | string[] | undefined): string | un
   return Array.isArray(value) ? value[0] : value;
 }
 
-function acceptsEncoding(headerValue: string | undefined, encoding: string): boolean {
+function acceptsEncoding(
+  headerValue: string | undefined,
+  encoding: string,
+): boolean {
   if (!headerValue) {
     return false;
   }
 
   const normalizedEncoding = encoding.toLowerCase();
-  for (const item of headerValue.split(',').map(value => value.trim().toLowerCase())) {
+  for (const item of headerValue
+    .split(',')
+    .map((value) => value.trim().toLowerCase())) {
     if (!item) {
       continue;
     }
 
-    const [name, ...params] = item.split(';').map(value => value.trim());
+    const [name, ...params] = item.split(';').map((value) => value.trim());
     if (name !== normalizedEncoding && name !== '*') {
       continue;
     }
 
-    const qParam = params.find(param => param.startsWith('q='));
+    const qParam = params.find((param) => param.startsWith('q='));
     if (!qParam) {
       return true;
     }
@@ -978,16 +1162,29 @@ function acceptsEncoding(headerValue: string | undefined, encoding: string): boo
   return false;
 }
 
-function isCorsPreflightRequest(method: string, headers: IncomingHttpHeaders): boolean {
-  return method === 'OPTIONS' && Boolean(headers.origin) && Boolean(headers['access-control-request-method']);
+function isCorsPreflightRequest(
+  method: string,
+  headers: IncomingHttpHeaders,
+): boolean {
+  return (
+    method === 'OPTIONS' &&
+    Boolean(headers.origin) &&
+    Boolean(headers['access-control-request-method'])
+  );
 }
 
-export function isCorsOriginAllowed(policy: RouteCorsPolicy, origin: string): boolean {
+export function isCorsOriginAllowed(
+  policy: RouteCorsPolicy,
+  origin: string,
+): boolean {
   if (!policy.enabled) {
     return false;
   }
 
-  return policy.allowedOrigins.includes('*') || policy.allowedOrigins.includes(origin);
+  return (
+    policy.allowedOrigins.includes('*') ||
+    policy.allowedOrigins.includes(origin)
+  );
 }
 
 function isDebugEnabled(value: string | undefined): boolean {
@@ -995,10 +1192,17 @@ function isDebugEnabled(value: string | undefined): boolean {
     return false;
   }
 
-  return value === '1' || value.toLowerCase() === 'true' || value.toLowerCase() === 'debug';
+  return (
+    value === '1' ||
+    value.toLowerCase() === 'true' ||
+    value.toLowerCase() === 'debug'
+  );
 }
 
-function buildIncomingUrl(hostHeader: string | undefined, requestUrl: URL): string {
+function buildIncomingUrl(
+  hostHeader: string | undefined,
+  requestUrl: URL,
+): string {
   if (!hostHeader) {
     return `${requestUrl.pathname}${requestUrl.search}`;
   }

@@ -41,14 +41,14 @@ docker pull fsarch/frontier-worker:stable
 ## Prerequisites
 
 - Node.js (LTS recommended)
-- npm with workspace support
+- pnpm (via corepack; run `corepack enable` once)
 
 ## Getting Started
 
 1. Install dependencies from the repository root:
 
 ```bash
-npm install
+pnpm install
 ```
 
 2. Prepare API configuration:
@@ -59,22 +59,22 @@ npm install
 3. Start the API service:
 
 ```bash
-npm --workspace apps/frontier-api run start:dev
+pnpm --filter ./apps/frontier-api run start:dev
 ```
 
 4. Start the worker in a second terminal:
 
 ```bash
-npm --workspace apps/frontier-worker run start:dev
+pnpm --filter ./apps/frontier-worker run start:dev
 ```
 
 ## Common Commands
 
 ```bash
-npm --workspace apps/frontier-api run build
-npm --workspace apps/frontier-api run test
-npm --workspace apps/frontier-worker run build
-npm --workspace apps/frontier-worker run test
+pnpm --filter ./apps/frontier-api run build
+pnpm --filter ./apps/frontier-api run test
+pnpm --filter ./apps/frontier-worker run build
+pnpm --filter ./apps/frontier-worker run test
 ```
 
 ## Tracing

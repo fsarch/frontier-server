@@ -1,6 +1,6 @@
-import { HookPayload } from './hook-payload.js';
 import type { RequestType } from '../../types/http/request.type.js';
 import type { ResponseType } from '../../types/http/response.type.js';
+import { HookPayload } from './hook-payload.js';
 
 export interface PostHookPayloadData {
   clientRequest: RequestType;

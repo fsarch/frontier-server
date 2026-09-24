@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UpstreamService } from './upstream.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Upstream } from '../../../../database/entities/upstream.entity.js';
 import { UpstreamSslOptions } from '../../../../database/entities/upstream-ssl-options.entity.js';
+import { UpstreamService } from './upstream.service';
 
 describe('UpstreamService', () => {
   let service: UpstreamService;

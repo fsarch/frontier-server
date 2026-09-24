@@ -1,19 +1,24 @@
 import { MigrationInterface, QueryRunner, Table, TableColumn } from 'typeorm';
 import { getDataType } from './utils/data-type.mapper.js';
 
-export class AddUpstreamProtocolAndSslOptions1783521000000 implements MigrationInterface {
+export class AddUpstreamProtocolAndSslOptions1783521000000
+  implements MigrationInterface
+{
   name = 'AddUpstreamProtocolAndSslOptions1783521000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     const databaseType = queryRunner.connection.driver.options.type;
 
-    await queryRunner.addColumn('upstream', new TableColumn({
-      name: 'protocol',
-      type: 'varchar',
-      length: '16',
-      isNullable: false,
-      default: `'http'`,
-    }));
+    await queryRunner.addColumn(
+      'upstream',
+      new TableColumn({
+        name: 'protocol',
+        type: 'varchar',
+        length: '16',
+        isNullable: false,
+        default: `'http'`,
+      }),
+    );
 
     await queryRunner.createTable(
       new Table({
@@ -43,14 +48,16 @@ export class AddUpstreamProtocolAndSslOptions1783521000000 implements MigrationI
             isNullable: true,
           },
         ],
-        foreignKeys: [{
-          name: 'fk__upstream_ssl_options__id',
-          onUpdate: 'NO ACTION',
-          onDelete: 'NO ACTION',
-          columnNames: ['id'],
-          referencedColumnNames: ['id'],
-          referencedTableName: 'upstream',
-        }],
+        foreignKeys: [
+          {
+            name: 'fk__upstream_ssl_options__id',
+            onUpdate: 'NO ACTION',
+            onDelete: 'NO ACTION',
+            columnNames: ['id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'upstream',
+          },
+        ],
       }),
     );
   }

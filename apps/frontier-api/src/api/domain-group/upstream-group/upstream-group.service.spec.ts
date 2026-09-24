@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UpstreamGroupService } from './upstream-group.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UpstreamGroup } from '../../../database/entities/upstream-group.entity.js';
+import { UpstreamGroupService } from './upstream-group.service';
 
 describe('UpstreamGroupService', () => {
   let service: UpstreamGroupService;

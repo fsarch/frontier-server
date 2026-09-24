@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PathRuleService } from './path-rule.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { PathRule } from '../../../database/entities/path-rule.entity.js';
 import { CorsPolicy } from '../../../database/entities/cors-policy.entity.js';
 import { LogPolicy } from '../../../database/entities/log-policy.entity.js';
+import { PathRule } from '../../../database/entities/path-rule.entity.js';
+import { PathRuleService } from './path-rule.service';
 
 describe('PathRuleService', () => {
   let service: PathRuleService;

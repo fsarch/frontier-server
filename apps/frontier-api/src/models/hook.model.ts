@@ -1,6 +1,6 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { Hook } from "../database/entities/hook.entity.js";
-import { Optional } from "@nestjs/common";
+import { Optional } from '@nestjs/common';
+import { ApiProperty } from '@nestjs/swagger';
+import { Hook } from '../database/entities/hook.entity.js';
 
 export class HookDto {
   static FromDbo(dbo: Hook) {

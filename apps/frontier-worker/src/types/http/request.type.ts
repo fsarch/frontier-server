@@ -1,4 +1,4 @@
-import type { BodyType, HeadersType } from "./shared.type.js";
+import type { BodyType, HeadersType } from './shared.type.js';
 
 export interface QueryParams {
   [key: string]: string[];
@@ -19,4 +19,3 @@ export interface RequestType {
   headers: HeadersType;
   body: BodyType | null;
 }
-

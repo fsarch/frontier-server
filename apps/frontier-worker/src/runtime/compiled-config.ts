@@ -1,5 +1,11 @@
-import { CachePolicy, CorsPolicy, EntityMap, Hook, PathRule, WorkerConfigSnapshot } from '../types/worker-config.types.js';
-import { FunctionConfigs, FunctionServerConfig, HookConfig } from './function-client.js';
+import {
+  CachePolicy,
+  CorsPolicy,
+  EntityMap,
+  Hook,
+  WorkerConfigSnapshot,
+} from '../types/worker-config.types.js';
+import { FunctionConfigs } from './function-client.js';
 
 export type CompiledCachePolicy = {
   enabled: boolean;
@@ -91,13 +97,21 @@ export type CompiledRouteDescription = {
 export class CompiledWorkerConfig {
   private readonly domainToDomainGroupId = new Map<string, string>();
   private readonly domainGroups = new Map<string, CompiledDomainGroup>();
-  private readonly debugEnabled = isDebugEnabled(process.env.FRONTIER_WORKER_DEBUG);
+  private readonly debugEnabled = isDebugEnabled(
+    process.env.FRONTIER_WORKER_DEBUG,
+  );
 
-  constructor(private readonly snapshot: WorkerConfigSnapshot, private readonly functionServerConfigs: FunctionConfigs) {
+  constructor(
+    private readonly snapshot: WorkerConfigSnapshot,
+    private readonly functionServerConfigs: FunctionConfigs,
+  ) {
     this.compile();
   }
 
-  public resolve(hostHeader: string | undefined, pathname: string): RouteResolution | null {
+  public resolve(
+    hostHeader: string | undefined,
+    pathname: string,
+  ): RouteResolution | null {
     if (!hostHeader) {
       this.debug(`resolve miss: missing host header for path=${pathname}`);
       return null;
@@ -106,7 +120,9 @@ export class CompiledWorkerConfig {
     const hostname = normalizeHostname(hostHeader);
     const domainGroupId = this.domainToDomainGroupId.get(hostname);
 
-    this.debug(`resolve start: host=${hostHeader} normalizedHost=${hostname} path=${pathname}`);
+    this.debug(
+      `resolve start: host=${hostHeader} normalizedHost=${hostname} path=${pathname}`,
+    );
 
     if (!domainGroupId) {
       this.debug(`resolve miss: no domain-group mapping for host=${hostname}`);
@@ -116,25 +132,33 @@ export class CompiledWorkerConfig {
     const domainGroup = this.domainGroups.get(domainGroupId);
 
     if (!domainGroup) {
-      this.debug(`resolve miss: domain-group=${domainGroupId} has no compiled routes`);
+      this.debug(
+        `resolve miss: domain-group=${domainGroupId} has no compiled routes`,
+      );
       return null;
     }
 
     for (const route of domainGroup.routes) {
       if (!matchesPathPrefix(pathname, route.pathPrefix)) {
-        this.debug(`resolve skip: path=${pathname} does not match prefix=${route.pathPrefix}`);
+        this.debug(
+          `resolve skip: path=${pathname} does not match prefix=${route.pathPrefix}`,
+        );
         continue;
       }
 
       if (route.upstreams.length === 0) {
-        this.debug(`resolve skip: prefix=${route.pathPrefix} has zero upstreams`);
+        this.debug(
+          `resolve skip: prefix=${route.pathPrefix} has zero upstreams`,
+        );
         continue;
       }
 
       const upstream = route.upstreams[route.cursor % route.upstreams.length];
       route.cursor += 1;
 
-      this.debug(`resolve hit: domainGroup=${domainGroupId} prefix=${route.pathPrefix} upstream=${upstream.host}:${upstream.port}${upstream.basePath} nextCursor=${route.cursor}`);
+      this.debug(
+        `resolve hit: domainGroup=${domainGroupId} prefix=${route.pathPrefix} upstream=${upstream.host}:${upstream.port}${upstream.basePath} nextCursor=${route.cursor}`,
+      );
 
       return {
         domainGroupId,
@@ -157,7 +181,9 @@ export class CompiledWorkerConfig {
       };
     }
 
-    this.debug(`resolve miss: no matching route for domainGroup=${domainGroupId} path=${pathname}`);
+    this.debug(
+      `resolve miss: no matching route for domainGroup=${domainGroupId} path=${pathname}`,
+    );
 
     return null;
   }
@@ -198,7 +224,8 @@ export class CompiledWorkerConfig {
 
   private compile() {
     for (const domainId of this.snapshot.domainGroupDomainsByDomain.ids) {
-      const domainRef = this.snapshot.domainGroupDomainsByDomain.entities[domainId];
+      const domainRef =
+        this.snapshot.domainGroupDomainsByDomain.entities[domainId];
       const domainName = domainRef?.domainName?.trim().toLowerCase();
 
       if (!domainRef?.domainGroupId || !domainName) {
@@ -210,8 +237,9 @@ export class CompiledWorkerConfig {
 
     for (const domainGroupId of this.snapshot.domainGroups.ids) {
       const domainGroup = this.snapshot.domainGroups.entities[domainGroupId];
-      const rules = [...(domainGroup?.pathRules ?? [])]
-        .sort((left, right) => left.order - right.order);
+      const rules = [...(domainGroup?.pathRules ?? [])].sort(
+        (left, right) => left.order - right.order,
+      );
 
       const routes: CompiledRoute[] = [];
 
@@ -222,7 +250,8 @@ export class CompiledWorkerConfig {
 
         const pathPattern = normalizePathPattern(rule.path);
 
-        const upstreamGroup = this.snapshot.upstreamGroups.entities[rule.upstreamGroupId];
+        const upstreamGroup =
+          this.snapshot.upstreamGroups.entities[rule.upstreamGroupId];
         const upstreams = (upstreamGroup?.upstreams ?? [])
           .filter((upstream) => upstream?.host && upstream?.port)
           .map((upstream) => ({
@@ -241,12 +270,32 @@ export class CompiledWorkerConfig {
           domainGroupId,
           pathRuleId: rule.id,
           pathPrefix: pathPattern,
-          log: compileLogPolicy(rule.logPolicyId ? this.snapshot.logPolicies.entities[rule.logPolicyId] : undefined),
-          cachePolicy: compileCachePolicy(rule.cachePolicyId ? this.snapshot.cachePolicies.entities[rule.cachePolicyId] : undefined),
+          log: compileLogPolicy(
+            rule.logPolicyId
+              ? this.snapshot.logPolicies.entities[rule.logPolicyId]
+              : undefined,
+          ),
+          cachePolicy: compileCachePolicy(
+            rule.cachePolicyId
+              ? this.snapshot.cachePolicies.entities[rule.cachePolicyId]
+              : undefined,
+          ),
           upstreams,
-          cors: compileCorsPolicy(rule.corsPolicyId ? this.snapshot.corsPolicies.entities[rule.corsPolicyId] : undefined),
-          preHooks: compileHooks(rule.preHookId, this.snapshot.hooks ?? ({} as EntityMap<Hook>), this.functionServerConfigs),
-          postHooks: compileHooks(rule.postHookId, this.snapshot.hooks ?? ({} as EntityMap<Hook>), this.functionServerConfigs),
+          cors: compileCorsPolicy(
+            rule.corsPolicyId
+              ? this.snapshot.corsPolicies.entities[rule.corsPolicyId]
+              : undefined,
+          ),
+          preHooks: compileHooks(
+            rule.preHookId,
+            this.snapshot.hooks ?? ({} as EntityMap<Hook>),
+            this.functionServerConfigs,
+          ),
+          postHooks: compileHooks(
+            rule.postHookId,
+            this.snapshot.hooks ?? ({} as EntityMap<Hook>),
+            this.functionServerConfigs,
+          ),
           cursor: 0,
         });
       }
@@ -259,14 +308,17 @@ export class CompiledWorkerConfig {
     const domainsByDomainGroupId = new Map<string, Set<string>>();
 
     for (const domainId of this.snapshot.domainGroupDomainsByDomain.ids) {
-      const domainRef = this.snapshot.domainGroupDomainsByDomain.entities[domainId];
+      const domainRef =
+        this.snapshot.domainGroupDomainsByDomain.entities[domainId];
       const domainName = domainRef?.domainName?.trim().toLowerCase();
 
       if (!domainRef?.domainGroupId || !domainName) {
         continue;
       }
 
-      const existingDomains = domainsByDomainGroupId.get(domainRef.domainGroupId) ?? new Set<string>();
+      const existingDomains =
+        domainsByDomainGroupId.get(domainRef.domainGroupId) ??
+        new Set<string>();
       existingDomains.add(domainName);
       domainsByDomainGroupId.set(domainRef.domainGroupId, existingDomains);
     }
@@ -274,7 +326,10 @@ export class CompiledWorkerConfig {
     const sortedDomainsByDomainGroupId = new Map<string, string[]>();
 
     for (const [domainGroupId, domains] of domainsByDomainGroupId.entries()) {
-      sortedDomainsByDomainGroupId.set(domainGroupId, [...domains].sort((left, right) => left.localeCompare(right)));
+      sortedDomainsByDomainGroupId.set(
+        domainGroupId,
+        [...domains].sort((left, right) => left.localeCompare(right)),
+      );
     }
 
     return sortedDomainsByDomainGroupId;
@@ -297,7 +352,9 @@ function normalizePath(pathname: string): string {
     : normalized;
 }
 
-function normalizeUpstreamProtocol(protocol: string | undefined): 'http' | 'https' {
+function normalizeUpstreamProtocol(
+  protocol: string | undefined,
+): 'http' | 'https' {
   if (protocol === 'https') {
     return 'https';
   }
@@ -305,12 +362,23 @@ function normalizeUpstreamProtocol(protocol: string | undefined): 'http' | 'http
   return 'http';
 }
 
-export function buildUpstreamPath(basePath: string, pathPrefix: string, requestPath: string): string {
-  const normalizedRequestPath = requestPath.startsWith('/') ? requestPath : `/${requestPath}`;
+export function buildUpstreamPath(
+  basePath: string,
+  pathPrefix: string,
+  requestPath: string,
+): string {
+  const normalizedRequestPath = requestPath.startsWith('/')
+    ? requestPath
+    : `/${requestPath}`;
   const normalizedPattern = normalizePathPattern(pathPrefix);
-  const suffix = isCatchAllPattern(normalizedPattern) || isSuffixWildcardPattern(normalizedPattern)
-    ? normalizedRequestPath
-    : buildPrefixRewriteSuffix(normalizedRequestPath, normalizePath(normalizedPattern));
+  const suffix =
+    isCatchAllPattern(normalizedPattern) ||
+    isSuffixWildcardPattern(normalizedPattern)
+      ? normalizedRequestPath
+      : buildPrefixRewriteSuffix(
+          normalizedRequestPath,
+          normalizePath(normalizedPattern),
+        );
   const normalizedBasePath = normalizePath(basePath);
 
   if (normalizedBasePath === '/') {
@@ -344,7 +412,10 @@ function matchesPrefixPath(pathname: string, pathPrefix: string): boolean {
     return true;
   }
 
-  return normalizedPath === normalizedPrefix || normalizedPath.startsWith(`${normalizedPrefix}/`);
+  return (
+    normalizedPath === normalizedPrefix ||
+    normalizedPath.startsWith(`${normalizedPrefix}/`)
+  );
 }
 
 function normalizePathPattern(pathPattern: string): string {
@@ -382,7 +453,10 @@ function isSuffixWildcardPattern(pathPattern: string): boolean {
   return pathPattern.startsWith('*.');
 }
 
-function buildPrefixRewriteSuffix(normalizedRequestPath: string, normalizedPrefix: string): string {
+function buildPrefixRewriteSuffix(
+  normalizedRequestPath: string,
+  normalizedPrefix: string,
+): string {
   if (normalizedPrefix === '/') {
     return normalizedRequestPath;
   }
@@ -395,7 +469,11 @@ function isDebugEnabled(value: string | undefined): boolean {
     return false;
   }
 
-  return value === '1' || value.toLowerCase() === 'true' || value.toLowerCase() === 'debug';
+  return (
+    value === '1' ||
+    value.toLowerCase() === 'true' ||
+    value.toLowerCase() === 'debug'
+  );
 }
 
 function compileCorsPolicy(policy: CorsPolicy | undefined): CompiledCorsPolicy {
@@ -420,7 +498,9 @@ function compileCorsPolicy(policy: CorsPolicy | undefined): CompiledCorsPolicy {
   };
 }
 
-function compileLogPolicy(policy: WorkerConfigSnapshot['logPolicies']['entities'][string] | undefined): CompiledLogPolicy {
+function compileLogPolicy(
+  policy: WorkerConfigSnapshot['logPolicies']['entities'][string] | undefined,
+): CompiledLogPolicy {
   return {
     enabled: policy?.enabled === true,
     logPolicyId: policy?.id ?? null,
@@ -428,7 +508,9 @@ function compileLogPolicy(policy: WorkerConfigSnapshot['logPolicies']['entities'
   };
 }
 
-function compileCachePolicy(policy: CachePolicy | undefined): CompiledCachePolicy {
+function compileCachePolicy(
+  policy: CachePolicy | undefined,
+): CompiledCachePolicy {
   // Cache ist standardmäßig aktiviert, wenn eine Policy existiert
   const enabled = policy !== undefined;
 
@@ -441,7 +523,11 @@ function compileCachePolicy(policy: CachePolicy | undefined): CompiledCachePolic
   };
 }
 
-function compileHooks(hookId: string | null | undefined, hooks: EntityMap<Hook>, functionServerConfigs: FunctionConfigs): CompiledHooks {
+function compileHooks(
+  hookId: string | null | undefined,
+  hooks: EntityMap<Hook>,
+  functionServerConfigs: FunctionConfigs,
+): CompiledHooks {
   if (!hookId) {
     return { enabled: false, functions: [] };
   }

@@ -1,8 +1,8 @@
+import { AuthGuard } from '@fsarch/server/auth';
+import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PathRuleController } from './path-rule.controller';
 import { PathRuleService } from './path-rule.service';
-import { AuthGuard } from '@fsarch/server/auth';
-import { Reflector } from '@nestjs/core';
 
 describe.skip('PathRuleController', () => {
   let controller: PathRuleController;

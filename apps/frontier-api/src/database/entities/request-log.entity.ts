@@ -107,4 +107,3 @@ export class RequestLog {
   })
   creationTime: Date;
 }
-

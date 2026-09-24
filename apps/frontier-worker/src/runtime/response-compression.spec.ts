@@ -1,13 +1,16 @@
-import { compressResponseBody } from './hooks/compression.hook.js';
-import { PostHookPayload } from './models/post-hook-payload.js';
-import { BodyUtils } from '../utils/http/body.utils.js';
 import type { RequestType } from '../types/http/request.type.js';
 import type { ResponseType } from '../types/http/response.type.js';
+import { BodyUtils } from '../utils/http/body.utils.js';
+import { compressResponseBody } from './hooks/compression.hook.js';
+import { PostHookPayload } from './models/post-hook-payload.js';
 
 /**
  * Helper function to create a PostHookPayload for tests
  */
-function createTestPostHookPayload(bodyText: string, headers: Record<string, string>): PostHookPayload {
+function createTestPostHookPayload(
+  bodyText: string,
+  headers: Record<string, string>,
+): PostHookPayload {
   const requestType: RequestType = {
     type: 'request',
     method: 'GET',
@@ -75,13 +78,17 @@ describe('compressResponseBody', () => {
       expect(result.body?.type).toBe('binary.uint8array');
       const compressedBody = rawBody(result);
       expect(compressedBody).toBeInstanceOf(Uint8Array);
-      expect((compressedBody as Uint8Array).byteLength).toBeLessThan(bodyText.length);
+      expect((compressedBody as Uint8Array).byteLength).toBeLessThan(
+        bodyText.length,
+      );
 
       // Should update headers
       expect(headerValue(result, 'content-encoding')).toBe('gzip');
       expect(headerValue(result, 'content-type')).toBe('text/plain');
       expect(headerValue(result, 'content-length')).toBeDefined();
-      expect(parseInt(headerValue(result, 'content-length')!, 10)).toBe((compressedBody as Uint8Array).byteLength);
+      expect(parseInt(headerValue(result, 'content-length')!, 10)).toBe(
+        (compressedBody as Uint8Array).byteLength,
+      );
       expect(headerValue(result, 'transfer-encoding')).toBeUndefined();
 
       // Should add vary header
@@ -92,7 +99,7 @@ describe('compressResponseBody', () => {
       const bodyText = 'x'.repeat(200);
       const headers: Record<string, string> = {
         'content-type': 'text/plain',
-        'vary': 'Origin',
+        vary: 'Origin',
       };
 
       const hookPayload = createTestPostHookPayload(bodyText, headers);
@@ -107,7 +114,7 @@ describe('compressResponseBody', () => {
     it('should not duplicate Accept-Encoding in vary header if already present', async () => {
       const bodyText = 'x'.repeat(200);
       const headers: Record<string, string> = {
-        'vary': 'Origin, Accept-Encoding',
+        vary: 'Origin, Accept-Encoding',
       };
 
       const hookPayload = createTestPostHookPayload(bodyText, headers);
@@ -150,8 +157,12 @@ describe('compressResponseBody', () => {
       });
 
       expect(debugMessages.length).toBeGreaterThan(0);
-      expect(debugMessages.some((msg) => msg.includes('compressing'))).toBe(true);
-      expect(debugMessages.some((msg) => msg.includes('compressed response from'))).toBe(true);
+      expect(debugMessages.some((msg) => msg.includes('compressing'))).toBe(
+        true,
+      );
+      expect(
+        debugMessages.some((msg) => msg.includes('compressed response from')),
+      ).toBe(true);
     });
   });
 
@@ -183,7 +194,9 @@ describe('compressResponseBody', () => {
         onDebug: (msg) => debugMessages.push(msg),
       });
 
-      expect(debugMessages.some((msg) => msg.includes('not compressing'))).toBe(true);
+      expect(debugMessages.some((msg) => msg.includes('not compressing'))).toBe(
+        true,
+      );
     });
   });
 
@@ -351,7 +364,10 @@ describe('compressResponseBody', () => {
       });
 
       const compressedBody = rawBody(result) as Uint8Array;
-      const compressedLength = parseInt(headerValue(result, 'content-length')!, 10);
+      const compressedLength = parseInt(
+        headerValue(result, 'content-length')!,
+        10,
+      );
       expect(compressedLength).toBeLessThan(200);
       expect(compressedLength).toBe(compressedBody.byteLength);
     });
@@ -420,7 +436,9 @@ describe('compressResponseBody', () => {
 
       // Either success message or fallback message should be present
       const hasCompressionMessage = debugMessages.some(
-        (msg) => msg.includes('compressed response from') || msg.includes('compression failed'),
+        (msg) =>
+          msg.includes('compressed response from') ||
+          msg.includes('compression failed'),
       );
       expect(hasCompressionMessage).toBe(true);
     });
@@ -432,7 +450,8 @@ describe('compressResponseBody', () => {
         data: {
           id: 1,
           name: 'Test',
-          description: 'This is a test object with enough text to be worth compressing.',
+          description:
+            'This is a test object with enough text to be worth compressing.',
           items: Array.from({ length: 10 }, (_, i) => ({
             id: i,
             value: `Item ${i}`.repeat(5),
@@ -733,8 +752,12 @@ describe('compressResponseBody', () => {
         onDebug: (msg) => debugMessages.push(msg),
       });
 
-      expect(debugMessages.some((msg) => msg.includes('content-type: text/html'))).toBe(true);
-      expect(debugMessages.some((msg) => msg.includes('compressible: true'))).toBe(true);
+      expect(
+        debugMessages.some((msg) => msg.includes('content-type: text/html')),
+      ).toBe(true);
+      expect(
+        debugMessages.some((msg) => msg.includes('compressible: true')),
+      ).toBe(true);
     });
   });
 });

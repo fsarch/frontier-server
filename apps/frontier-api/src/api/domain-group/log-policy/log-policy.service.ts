@@ -2,8 +2,11 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LogPolicy } from '../../../database/entities/log-policy.entity.js';
-import { LogPolicyCreateDto, LogPolicyUpdateDto } from '../../../models/log-policy.model.js';
 import { PathRule } from '../../../database/entities/path-rule.entity.js';
+import {
+  LogPolicyCreateDto,
+  LogPolicyUpdateDto,
+} from '../../../models/log-policy.model.js';
 
 @Injectable()
 export class LogPolicyService {
@@ -12,8 +15,7 @@ export class LogPolicyService {
     private readonly logPolicyRepository: Repository<LogPolicy>,
     @InjectRepository(PathRule)
     private readonly pathRuleRepository: Repository<PathRule>,
-  ) {
-  }
+  ) {}
 
   public async Create(domainGroupId: string, dto: LogPolicyCreateDto) {
     const createdLogPolicy = this.logPolicyRepository.create({
@@ -24,7 +26,8 @@ export class LogPolicyService {
       retentionTimeSeconds: normalizeRetentionTime(dto.retentionTimeSeconds),
     });
 
-    const savedLogPolicy = await this.logPolicyRepository.save(createdLogPolicy);
+    const savedLogPolicy =
+      await this.logPolicyRepository.save(createdLogPolicy);
 
     return {
       id: savedLogPolicy.id,
@@ -56,7 +59,11 @@ export class LogPolicyService {
     return policy;
   }
 
-  public async Update(id: string, domainGroupId: string, dto: LogPolicyUpdateDto) {
+  public async Update(
+    id: string,
+    domainGroupId: string,
+    dto: LogPolicyUpdateDto,
+  ) {
     const policy = await this.GetById(id, domainGroupId);
 
     if (dto.name !== undefined) {
@@ -68,7 +75,9 @@ export class LogPolicyService {
     }
 
     if (dto.retentionTimeSeconds !== undefined) {
-      policy.retentionTimeSeconds = normalizeRetentionTime(dto.retentionTimeSeconds);
+      policy.retentionTimeSeconds = normalizeRetentionTime(
+        dto.retentionTimeSeconds,
+      );
     }
 
     return this.logPolicyRepository.save(policy);
@@ -93,4 +102,3 @@ function normalizeRetentionTime(value: number | undefined): number {
 
   return Math.floor(value);
 }
-

@@ -1,16 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { DomainGroupDomainCreateDto, DomainGroupDomainDto } from "../../../models/domain-group-domain.model.js";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { DomainGroupDomain } from "../../../database/entities/domain-group-domain.entity.js";
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { DomainGroupDomain } from '../../../database/entities/domain-group-domain.entity.js';
+import { DomainGroupDomainCreateDto } from '../../../models/domain-group-domain.model.js';
 
 @Injectable()
 export class DomainService {
   constructor(
     @InjectRepository(DomainGroupDomain)
     private domainGroupDomainRepository: Repository<DomainGroupDomain>,
-  ) {
-  }
+  ) {}
 
   public async Create(
     domainGroupId: string,
@@ -22,16 +21,15 @@ export class DomainService {
       ...domainDto,
     });
 
-    const savedDomain = await this.domainGroupDomainRepository.save(createdDomain);
+    const savedDomain =
+      await this.domainGroupDomainRepository.save(createdDomain);
 
     return {
       id: savedDomain.id,
     };
   }
 
-  public async ListByDomainGroupId(
-    domainGroupId: string,
-  ) {
+  public async ListByDomainGroupId(domainGroupId: string) {
     return this.domainGroupDomainRepository.find({
       where: { domainGroupId },
     });

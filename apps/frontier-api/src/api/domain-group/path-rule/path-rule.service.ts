@@ -1,10 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { CorsPolicy } from "../../../database/entities/cors-policy.entity.js";
-import { LogPolicy } from "../../../database/entities/log-policy.entity.js";
-import { PathRule } from "../../../database/entities/path-rule.entity.js";
-import { PathRuleCreateDto, PathRuleUpdateDto } from "../../../models/path-rule.model.js";
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CorsPolicy } from '../../../database/entities/cors-policy.entity.js';
+import { LogPolicy } from '../../../database/entities/log-policy.entity.js';
+import { PathRule } from '../../../database/entities/path-rule.entity.js';
+import {
+  PathRuleCreateDto,
+  PathRuleUpdateDto,
+} from '../../../models/path-rule.model.js';
 
 @Injectable()
 export class PathRuleService {
@@ -15,14 +18,9 @@ export class PathRuleService {
     private readonly corsPolicyRepository: Repository<CorsPolicy>,
     @InjectRepository(LogPolicy)
     private readonly logPolicyRepository: Repository<LogPolicy>,
-  ) {
-  }
+  ) {}
 
-
-  public async Create(
-    domainGroupId: string,
-    pathRuleDto: PathRuleCreateDto,
-  ) {
+  public async Create(domainGroupId: string, pathRuleDto: PathRuleCreateDto) {
     await this.ensureCorsPolicyExists(domainGroupId, pathRuleDto.corsPolicyId);
     await this.ensureLogPolicyExists(domainGroupId, pathRuleDto.logPolicyId);
 
@@ -39,13 +37,11 @@ export class PathRuleService {
     };
   }
 
-  public async ListByDomainGroupId(
-    domainGroupId: string,
-  ) {
+  public async ListByDomainGroupId(domainGroupId: string) {
     return this.pathRuleRepository.find({
       where: { domainGroupId },
       order: {
-        order: "ASC",
+        order: 'ASC',
       },
     });
   }
@@ -53,13 +49,15 @@ export class PathRuleService {
   public async List() {
     return this.pathRuleRepository.find({
       order: {
-        order: "ASC",
+        order: 'ASC',
       },
     });
   }
 
   public async GetById(domainGroupId: string, id: string): Promise<PathRule> {
-    const pathRule = await this.pathRuleRepository.findOne({ where: { id, domainGroupId } });
+    const pathRule = await this.pathRuleRepository.findOne({
+      where: { id, domainGroupId },
+    });
 
     if (!pathRule) {
       throw new NotFoundException(`PathRule ${id} not found`);
@@ -68,7 +66,11 @@ export class PathRuleService {
     return pathRule;
   }
 
-  public async Update(id: string, domainGroupId: string, dto: PathRuleUpdateDto): Promise<PathRule> {
+  public async Update(
+    id: string,
+    domainGroupId: string,
+    dto: PathRuleUpdateDto,
+  ): Promise<PathRule> {
     const pathRule = await this.GetById(domainGroupId, id);
     await this.ensureCorsPolicyExists(domainGroupId, dto.corsPolicyId);
     await this.ensureLogPolicyExists(domainGroupId, dto.logPolicyId);
@@ -83,7 +85,10 @@ export class PathRuleService {
     await this.pathRuleRepository.softDelete(pathRule.id);
   }
 
-  private async ensureCorsPolicyExists(domainGroupId: string, corsPolicyId: string | null | undefined): Promise<void> {
+  private async ensureCorsPolicyExists(
+    domainGroupId: string,
+    corsPolicyId: string | null | undefined,
+  ): Promise<void> {
     if (!corsPolicyId) {
       return;
     }
@@ -100,7 +105,10 @@ export class PathRuleService {
     }
   }
 
-  private async ensureLogPolicyExists(domainGroupId: string, logPolicyId: string | null | undefined): Promise<void> {
+  private async ensureLogPolicyExists(
+    domainGroupId: string,
+    logPolicyId: string | null | undefined,
+  ): Promise<void> {
     if (!logPolicyId) {
       return;
     }

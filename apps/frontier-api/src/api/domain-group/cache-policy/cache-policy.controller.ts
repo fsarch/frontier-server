@@ -1,10 +1,22 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { AuthGuard } from '@fsarch/server/auth';
 import { Roles } from '@fsarch/server/uac';
-import { CachePolicyService } from "./cache-policy.service.js";
-import { CachePolicyCreateDto, CachePolicyDto, CachePolicyUpdateDto } from "../../../models/cache-policy.model.js";
-import { Role } from "../../../constants/role.enum.js";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Role } from '../../../constants/role.enum.js';
+import {
+  CachePolicyCreateDto,
+  CachePolicyDto,
+  CachePolicyUpdateDto,
+} from '../../../models/cache-policy.model.js';
+import { CachePolicyService } from './cache-policy.service.js';
 
 @ApiTags('cache-policies')
 @Controller({
@@ -13,10 +25,7 @@ import { Role } from "../../../constants/role.enum.js";
 })
 @ApiBearerAuth()
 export class CachePolicyController {
-  constructor(
-    private readonly cachePolicyService: CachePolicyService,
-  ) {
-  }
+  constructor(private readonly cachePolicyService: CachePolicyService) {}
 
   @Post()
   @UseGuards(AuthGuard)
@@ -34,12 +43,9 @@ export class CachePolicyController {
   @Get()
   @UseGuards(AuthGuard)
   @Roles(Role.manage)
-  public async List(
-    @Param('domainGroupId') domainGroupId: string,
-  ) {
-    const cachePolicies = await this.cachePolicyService.ListByDomainGroupId(
-      domainGroupId,
-    );
+  public async List(@Param('domainGroupId') domainGroupId: string) {
+    const cachePolicies =
+      await this.cachePolicyService.ListByDomainGroupId(domainGroupId);
 
     return cachePolicies.map(CachePolicyDto.FromDbo);
   }

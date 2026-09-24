@@ -1,12 +1,21 @@
-import type { IncomingHttpHeaders } from 'http';
-import { appendForwardedHeaders, buildRequestHeaders } from './http-proxy.server.js';
+import type { IncomingHttpHeaders } from 'node:http';
+import {
+  appendForwardedHeaders,
+  buildRequestHeaders,
+} from './http-proxy.server.js';
 
 describe('appendForwardedHeaders', () => {
   it('sets x-forwarded headers when none are present', () => {
     const upstreamHeaders: Record<string, string> = {};
     const incomingHeaders: IncomingHttpHeaders = {};
 
-    appendForwardedHeaders(upstreamHeaders, incomingHeaders, 'api.example.com:8080', '/api/', false);
+    appendForwardedHeaders(
+      upstreamHeaders,
+      incomingHeaders,
+      'api.example.com:8080',
+      '/api/',
+      false,
+    );
 
     expect(upstreamHeaders['x-forwarded-host']).toBe('api.example.com:8080');
     expect(upstreamHeaders['x-forwarded-proto']).toBe('http');
@@ -24,9 +33,17 @@ describe('appendForwardedHeaders', () => {
       'x-forwarded-port': '443',
     };
 
-    appendForwardedHeaders(upstreamHeaders, incomingHeaders, 'worker.internal:3000', '/api', false);
+    appendForwardedHeaders(
+      upstreamHeaders,
+      incomingHeaders,
+      'worker.internal:3000',
+      '/api',
+      false,
+    );
 
-    expect(upstreamHeaders['x-forwarded-host']).toBe('edge.example.com, worker.internal:3000');
+    expect(upstreamHeaders['x-forwarded-host']).toBe(
+      'edge.example.com, worker.internal:3000',
+    );
     expect(upstreamHeaders['x-forwarded-proto']).toBe('https, https');
     expect(upstreamHeaders['x-forwarded-port']).toBe('443, 443');
   });
@@ -37,7 +54,13 @@ describe('appendForwardedHeaders', () => {
       host: 'secure.example.com',
     };
 
-    appendForwardedHeaders(upstreamHeaders, incomingHeaders, 'secure.example.com', '*', true);
+    appendForwardedHeaders(
+      upstreamHeaders,
+      incomingHeaders,
+      'secure.example.com',
+      '*',
+      true,
+    );
 
     expect(upstreamHeaders['x-forwarded-proto']).toBe('https');
     expect(upstreamHeaders['x-forwarded-port']).toBe('443');
@@ -47,7 +70,13 @@ describe('appendForwardedHeaders', () => {
     const upstreamHeaders: Record<string, string> = {};
     const incomingHeaders: IncomingHttpHeaders = {};
 
-    appendForwardedHeaders(upstreamHeaders, incomingHeaders, '[::1]:9090', '/v1', false);
+    appendForwardedHeaders(
+      upstreamHeaders,
+      incomingHeaders,
+      '[::1]:9090',
+      '/v1',
+      false,
+    );
 
     expect(upstreamHeaders['x-forwarded-port']).toBe('9090');
   });
@@ -70,4 +99,3 @@ describe('buildRequestHeaders', () => {
     expect(result.baggage).toBeUndefined();
   });
 });
-

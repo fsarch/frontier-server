@@ -63,4 +63,3 @@ export class CorsPolicy {
   })
   deletionTime: Date;
 }
-

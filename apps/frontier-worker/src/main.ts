@@ -1,22 +1,36 @@
 import { ControlPlaneClient } from './control-plane/control-plane.client.js';
-import { HttpProxyServer, RequestLogPayload } from './runtime/http-proxy.server.js';
-import { FunctionClient } from './runtime/function-client.js';
 import { loadWorkerConfig } from './runtime/config-loader.js';
+import { FunctionClient } from './runtime/function-client.js';
+import {
+  HttpProxyServer,
+  RequestLogPayload,
+} from './runtime/http-proxy.server.js';
 import { shutdownTracing } from './tracing/tracing.js';
 
 const workerPort = parseInt(process.env.FRONTIER_WORKER_PORT ?? '8080', 10);
-const controlPlaneUrl = process.env.FRONTIER_CONTROL_PLANE_URL ?? 'ws://localhost:3000/api/workers/websocket';
+const controlPlaneUrl =
+  process.env.FRONTIER_CONTROL_PLANE_URL ??
+  'ws://localhost:3000/api/workers/websocket';
 const workerAuthToken = process.env.FRONTIER_WORKER_AUTH_TOKEN ?? 'Test';
-const heartbeatIntervalMs = parseInt(process.env.FRONTIER_WORKER_HEARTBEAT_MS ?? '10000', 10);
-const workerLogIngestUrl = process.env.FRONTIER_WORKER_LOG_INGEST_URL ?? deriveWorkerLogIngestUrl(controlPlaneUrl);
+const heartbeatIntervalMs = parseInt(
+  process.env.FRONTIER_WORKER_HEARTBEAT_MS ?? '10000',
+  10,
+);
+const workerLogIngestUrl =
+  process.env.FRONTIER_WORKER_LOG_INGEST_URL ??
+  deriveWorkerLogIngestUrl(controlPlaneUrl);
 const configPath = process.env.FRONTIER_WORKER_CONFIG_PATH;
 
 async function bootstrap() {
-  console.log(`[worker] initializing worker auth=${process.env.FRONTIER_WORKER_AUTH_TOKEN ? 'env' : 'default'} logIngestUrl=${workerLogIngestUrl}`);
+  console.log(
+    `[worker] initializing worker auth=${process.env.FRONTIER_WORKER_AUTH_TOKEN ? 'env' : 'default'} logIngestUrl=${workerLogIngestUrl}`,
+  );
 
   // Load function configurations
   const functionConfigs = await loadWorkerConfig(configPath);
-  console.log(`[worker] loaded function configs: worker=${functionConfigs.function_worker ? 'configured' : 'not configured'}`);
+  console.log(
+    `[worker] loaded function configs: worker=${functionConfigs.function_worker ? 'configured' : 'not configured'}`,
+  );
 
   const functionClient = new FunctionClient(functionConfigs);
 
@@ -77,8 +91,12 @@ async function postRequestLog(payload: RequestLogPayload): Promise<void> {
   if (response.status >= 300) {
     const responseText = await response.text();
     const errorDetails = responseText ? ` (${responseText})` : '';
-    console.error(`[worker] log ingest failed: status=${response.status}, token=${workerAuthToken ? 'set' : 'empty'}, url=${workerLogIngestUrl}, details=${errorDetails}`);
-    throw new Error(`log ingest failed status=${response.status}${errorDetails} url=${workerLogIngestUrl}`);
+    console.error(
+      `[worker] log ingest failed: status=${response.status}, token=${workerAuthToken ? 'set' : 'empty'}, url=${workerLogIngestUrl}, details=${errorDetails}`,
+    );
+    throw new Error(
+      `log ingest failed status=${response.status}${errorDetails} url=${workerLogIngestUrl}`,
+    );
   }
 }
 
@@ -98,5 +116,3 @@ function deriveWorkerLogIngestUrl(websocketUrl: string): string {
 
   return parsed.toString();
 }
-
-

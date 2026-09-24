@@ -1,10 +1,24 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { AuthGuard } from '@fsarch/server/auth';
 import { Roles } from '@fsarch/server/uac';
-import { PathRuleService } from "./path-rule.service.js";
-import { PathRuleCreateDto, PathRuleDto, PathRuleUpdateDto } from "../../../models/path-rule.model.js";
-import { Role } from "../../../constants/role.enum.js";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Role } from '../../../constants/role.enum.js';
+import {
+  PathRuleCreateDto,
+  PathRuleDto,
+  PathRuleUpdateDto,
+} from '../../../models/path-rule.model.js';
+import { PathRuleService } from './path-rule.service.js';
 
 @ApiTags('path-rules')
 @Controller({
@@ -13,10 +27,7 @@ import { Role } from "../../../constants/role.enum.js";
 })
 @ApiBearerAuth()
 export class PathRuleController {
-  constructor(
-    private readonly pathRuleService: PathRuleService,
-  ) {
-  }
+  constructor(private readonly pathRuleService: PathRuleService) {}
 
   @Post()
   @UseGuards(AuthGuard)
@@ -25,21 +36,15 @@ export class PathRuleController {
     @Body() pathRuleCreateDto: PathRuleCreateDto,
     @Param('domainGroupId') domainGroupId: string,
   ) {
-    return await this.pathRuleService.Create(
-      domainGroupId,
-      pathRuleCreateDto,
-    );
+    return await this.pathRuleService.Create(domainGroupId, pathRuleCreateDto);
   }
 
   @Get()
   @UseGuards(AuthGuard)
   @Roles(Role.manage)
-  public async List(
-    @Param('domainGroupId') domainGroupId: string,
-  ) {
-    const pathRules = await this.pathRuleService.ListByDomainGroupId(
-      domainGroupId,
-    );
+  public async List(@Param('domainGroupId') domainGroupId: string) {
+    const pathRules =
+      await this.pathRuleService.ListByDomainGroupId(domainGroupId);
 
     return pathRules.map(PathRuleDto.FromDbo);
   }
@@ -63,7 +68,11 @@ export class PathRuleController {
     @Param('id') id: string,
     @Body() pathRuleUpdateDto: PathRuleUpdateDto,
   ) {
-    const updated = await this.pathRuleService.Update(id, domainGroupId, pathRuleUpdateDto);
+    const updated = await this.pathRuleService.Update(
+      id,
+      domainGroupId,
+      pathRuleUpdateDto,
+    );
     return PathRuleDto.FromDbo(updated);
   }
 

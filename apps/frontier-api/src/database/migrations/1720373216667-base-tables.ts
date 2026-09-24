@@ -74,26 +74,32 @@ export class BaseTables1720373216667 implements MigrationInterface {
             isNullable: true,
           },
         ],
-        foreignKeys: [{
-          name: 'fk__domain_group_domain__domain_group_id',
-          onUpdate: 'NO ACTION',
-          onDelete: 'NO ACTION',
-          columnNames: ['domain_group_id'],
-          referencedColumnNames: ['id'],
-          referencedTableName: 'domain_group',
-        }],
-        indices: [{
-          name: 'IDX__domain_group_domain__domain_group_id',
-          columnNames: ['domain_group_id'],
-        }, {
-          name: 'IDX__domain_group_domain__domain_name',
-          columnNames: ['domain_name'],
-        }, {
-          name: 'UI__domain_group_domain__domain_name',
-          columnNames: ['domain_name'],
-          isUnique: true,
-          where: 'deletion_time IS NULL',
-        }],
+        foreignKeys: [
+          {
+            name: 'fk__domain_group_domain__domain_group_id',
+            onUpdate: 'NO ACTION',
+            onDelete: 'NO ACTION',
+            columnNames: ['domain_group_id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'domain_group',
+          },
+        ],
+        indices: [
+          {
+            name: 'IDX__domain_group_domain__domain_group_id',
+            columnNames: ['domain_group_id'],
+          },
+          {
+            name: 'IDX__domain_group_domain__domain_name',
+            columnNames: ['domain_name'],
+          },
+          {
+            name: 'UI__domain_group_domain__domain_name',
+            columnNames: ['domain_name'],
+            isUnique: true,
+            where: 'deletion_time IS NULL',
+          },
+        ],
       }),
     );
     // endregion
@@ -132,18 +138,22 @@ export class BaseTables1720373216667 implements MigrationInterface {
             isNullable: true,
           },
         ],
-        foreignKeys: [{
-          name: 'fk__upstream_group__domain_group_id',
-          onUpdate: 'NO ACTION',
-          onDelete: 'NO ACTION',
-          columnNames: ['domain_group_id'],
-          referencedColumnNames: ['id'],
-          referencedTableName: 'domain_group',
-        }],
-        indices: [{
-          name: 'IDX__upstream_group__domain_group_id',
-          columnNames: ['domain_group_id'],
-        }],
+        foreignKeys: [
+          {
+            name: 'fk__upstream_group__domain_group_id',
+            onUpdate: 'NO ACTION',
+            onDelete: 'NO ACTION',
+            columnNames: ['domain_group_id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'domain_group',
+          },
+        ],
+        indices: [
+          {
+            name: 'IDX__upstream_group__domain_group_id',
+            columnNames: ['domain_group_id'],
+          },
+        ],
       }),
     );
     // endregion
@@ -199,21 +209,26 @@ export class BaseTables1720373216667 implements MigrationInterface {
             isNullable: true,
           },
         ],
-        foreignKeys: [{
-          name: 'fk__upstream__upstream_group_id',
-          onUpdate: 'NO ACTION',
-          onDelete: 'NO ACTION',
-          columnNames: ['upstream_group_id'],
-          referencedColumnNames: ['id'],
-          referencedTableName: 'upstream_group',
-        }],
-        indices: [{
-          name: 'IDX__upstream__upstream_group_id',
-          columnNames: ['upstream_group_id'],
-        }, {
-          name: 'IDX__upstream__host__port',
-          columnNames: ['host', 'port'],
-        }],
+        foreignKeys: [
+          {
+            name: 'fk__upstream__upstream_group_id',
+            onUpdate: 'NO ACTION',
+            onDelete: 'NO ACTION',
+            columnNames: ['upstream_group_id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'upstream_group',
+          },
+        ],
+        indices: [
+          {
+            name: 'IDX__upstream__upstream_group_id',
+            columnNames: ['upstream_group_id'],
+          },
+          {
+            name: 'IDX__upstream__host__port',
+            columnNames: ['host', 'port'],
+          },
+        ],
       }),
     );
     // endregion
@@ -319,18 +334,22 @@ export class BaseTables1720373216667 implements MigrationInterface {
             isNullable: true,
           },
         ],
-        foreignKeys: [{
-          name: 'fk__cache_policy__domain_group_id',
-          onUpdate: 'NO ACTION',
-          onDelete: 'NO ACTION',
-          columnNames: ['domain_group_id'],
-          referencedColumnNames: ['id'],
-          referencedTableName: 'domain_group',
-        }],
-        indices: [{
-          name: 'IDX__cache_policy__domain_group_id',
-          columnNames: ['domain_group_id'],
-        }],
+        foreignKeys: [
+          {
+            name: 'fk__cache_policy__domain_group_id',
+            onUpdate: 'NO ACTION',
+            onDelete: 'NO ACTION',
+            columnNames: ['domain_group_id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'domain_group',
+          },
+        ],
+        indices: [
+          {
+            name: 'IDX__cache_policy__domain_group_id',
+            columnNames: ['domain_group_id'],
+          },
+        ],
       }),
     );
     // endregion
@@ -390,32 +409,38 @@ export class BaseTables1720373216667 implements MigrationInterface {
             isNullable: true,
           },
         ],
-        foreignKeys: [{
-          name: 'fk__path_rule__domain_group_id',
-          onUpdate: 'NO ACTION',
-          onDelete: 'NO ACTION',
-          columnNames: ['domain_group_id'],
-          referencedColumnNames: ['id'],
-          referencedTableName: 'domain_group',
-        }, {
-          name: 'fk__path_rule__cache_policy_id',
-          onUpdate: 'NO ACTION',
-          onDelete: 'NO ACTION',
-          columnNames: ['cache_policy_id'],
-          referencedColumnNames: ['id'],
-          referencedTableName: 'cache_policy',
-        }, {
-          name: 'fk__path_rule__upstream_group_id',
-          onUpdate: 'NO ACTION',
-          onDelete: 'NO ACTION',
-          columnNames: ['upstream_group_id'],
-          referencedColumnNames: ['id'],
-          referencedTableName: 'upstream_group',
-        }],
-        indices: [{
-          name: 'IDX__path_rule__domain_group_id',
-          columnNames: ['domain_group_id'],
-        }],
+        foreignKeys: [
+          {
+            name: 'fk__path_rule__domain_group_id',
+            onUpdate: 'NO ACTION',
+            onDelete: 'NO ACTION',
+            columnNames: ['domain_group_id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'domain_group',
+          },
+          {
+            name: 'fk__path_rule__cache_policy_id',
+            onUpdate: 'NO ACTION',
+            onDelete: 'NO ACTION',
+            columnNames: ['cache_policy_id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'cache_policy',
+          },
+          {
+            name: 'fk__path_rule__upstream_group_id',
+            onUpdate: 'NO ACTION',
+            onDelete: 'NO ACTION',
+            columnNames: ['upstream_group_id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'upstream_group',
+          },
+        ],
+        indices: [
+          {
+            name: 'IDX__path_rule__domain_group_id',
+            columnNames: ['domain_group_id'],
+          },
+        ],
       }),
     );
     // endregion

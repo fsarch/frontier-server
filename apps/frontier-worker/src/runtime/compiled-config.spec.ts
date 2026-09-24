@@ -1,5 +1,5 @@
-import { buildUpstreamPath, CompiledWorkerConfig } from './compiled-config.js';
 import { WorkerConfigSnapshot } from '../types/worker-config.types.js';
+import { buildUpstreamPath, CompiledWorkerConfig } from './compiled-config.js';
 
 function createSnapshot(): WorkerConfigSnapshot {
   return {
@@ -332,7 +332,10 @@ describe('CompiledWorkerConfig', () => {
     expect(route).not.toBeNull();
     expect(route?.cors.enabled).toBe(true);
     expect(route?.cors.allowCredentials).toBe(true);
-    expect(route?.cors.allowedOrigins).toEqual(['https://app.example.com', '*']);
+    expect(route?.cors.allowedOrigins).toEqual([
+      'https://app.example.com',
+      '*',
+    ]);
   });
 
   it('compiles and resolves log policy per matched rule', () => {
@@ -404,7 +407,9 @@ describe('buildUpstreamPath', () => {
   });
 
   it('rewrites prefixed routes onto upstream base paths', () => {
-    expect(buildUpstreamPath('/backend', '/api', '/api/users')).toBe('/backend/users');
+    expect(buildUpstreamPath('/backend', '/api', '/api/users')).toBe(
+      '/backend/users',
+    );
   });
 
   it('keeps full path for catch-all wildcard routes', () => {
@@ -412,12 +417,20 @@ describe('buildUpstreamPath', () => {
   });
 
   it('keeps full path for suffix wildcard routes', () => {
-    expect(buildUpstreamPath('/backend', '*.html', '/assets/index.html')).toBe('/backend/assets/index.html');
+    expect(buildUpstreamPath('/backend', '*.html', '/assets/index.html')).toBe(
+      '/backend/assets/index.html',
+    );
   });
 
   it('rewrites prefix wildcard routes like /dashboard/* to upstream base path', () => {
-    expect(buildUpstreamPath('/app', '/dashboard/*', '/dashboard')).toBe('/app');
-    expect(buildUpstreamPath('/app', '/dashboard/*', '/dashboard/')).toBe('/app/');
-    expect(buildUpstreamPath('/app', '/dashboard/*', '/dashboard/stats')).toBe('/app/stats');
+    expect(buildUpstreamPath('/app', '/dashboard/*', '/dashboard')).toBe(
+      '/app',
+    );
+    expect(buildUpstreamPath('/app', '/dashboard/*', '/dashboard/')).toBe(
+      '/app/',
+    );
+    expect(buildUpstreamPath('/app', '/dashboard/*', '/dashboard/stats')).toBe(
+      '/app/stats',
+    );
   });
 });

@@ -11,30 +11,30 @@ npm-workspaces monorepo (lerna is present but only used for versioning, not publ
 
 Both apps are ESM (`"type": "module"`), TypeScript with `NodeNext` module resolution — **relative imports must use explicit `.js` extensions**, even though the source is `.ts`.
 
-`@fsarch/server` is a private package published to GitHub Packages under the `@fsarch` scope; installing dependencies requires npm to be configured with a token for `npm.pkg.github.com` (see `.github/workflows/test.yml` for the exact `.npmrc` setup CI uses).
+`@fsarch/server` is a private package published to GitHub Packages under the `@fsarch` scope; installing dependencies requires npm/pnpm to be configured with a token for `npm.pkg.github.com` (see `.github/workflows/test.yml` for the exact `.npmrc` setup CI uses).
 
 ## Commands
 
-Run from the repo root unless noted. Both apps are npm workspaces, so `npm --workspace apps/<app> run <script>` works from the root, or `cd` into the app dir and drop the `--workspace` flag.
+Run from the repo root unless noted. This is a pnpm workspace (via corepack — run `corepack enable` once), so `pnpm --filter ./apps/<app> run <script>` works from the root, or `cd` into the app dir and drop the `--filter`.
 
 ```bash
 # install (root, installs both workspaces)
-npm install
+pnpm install
 
 # frontier-api
-npm --workspace apps/frontier-api run start:dev     # dev server (port 3000 / $PORT), Swagger at /docs
-npm --workspace apps/frontier-api run build          # uses `fsarch-server build` (from @fsarch/server CLI)
-npm --workspace apps/frontier-api run lint
-npm --workspace apps/frontier-api run test           # vitest run (unit specs: **/*.spec.ts)
-npm --workspace apps/frontier-api run test:watch
-npm --workspace apps/frontier-api run test:e2e       # vitest run -c vitest.e2e.config.ts (**/*.e2e-spec.ts)
+pnpm --filter ./apps/frontier-api run start:dev     # dev server (port 3000 / $PORT), Swagger at /docs
+pnpm --filter ./apps/frontier-api run build          # uses `fsarch-server build` (from @fsarch/server CLI)
+pnpm --filter ./apps/frontier-api run lint           # biome check --write
+pnpm --filter ./apps/frontier-api run test           # vitest run (unit specs: **/*.spec.ts)
+pnpm --filter ./apps/frontier-api run test:watch
+pnpm --filter ./apps/frontier-api run test:e2e       # vitest run -c vitest.e2e.config.ts (**/*.e2e-spec.ts)
 
 # frontier-worker
-npm --workspace apps/frontier-worker run start:dev   # tsc --watch + node --watch dist/main.js
-npm --workspace apps/frontier-worker run start:local # ./scripts/start-local.zsh, sets local env defaults
-npm --workspace apps/frontier-worker run build
-npm --workspace apps/frontier-worker run lint
-npm --workspace apps/frontier-worker run test        # vitest run (src/**/*.spec.ts)
+pnpm --filter ./apps/frontier-worker run start:dev   # tsc --watch + node --watch dist/main.js
+pnpm --filter ./apps/frontier-worker run start:local # ./scripts/start-local.zsh, sets local env defaults
+pnpm --filter ./apps/frontier-worker run build
+pnpm --filter ./apps/frontier-worker run lint        # biome check --write
+pnpm --filter ./apps/frontier-worker run test        # vitest run (src/**/*.spec.ts)
 ```
 
 Run a single test file directly with vitest, e.g.:

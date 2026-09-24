@@ -1,10 +1,13 @@
+import { AuthGuard } from '@fsarch/server/auth';
+import { Roles } from '@fsarch/server/uac';
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
-import { DomainGroupCreateDto, DomainGroupDto } from "../../models/domain-group.model.js";
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import { AuthGuard } from "@fsarch/server/auth";
-import { Roles } from "@fsarch/server/uac";
-import { DomainGroupService } from "./domain-group.service.js";
-import { Role } from "../../constants/role.enum.js";
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Role } from '../../constants/role.enum.js';
+import {
+  DomainGroupCreateDto,
+  DomainGroupDto,
+} from '../../models/domain-group.model.js';
+import { DomainGroupService } from './domain-group.service.js';
 
 @ApiTags('domain-groups')
 @Controller({
@@ -13,10 +16,7 @@ import { Role } from "../../constants/role.enum.js";
 })
 @ApiBearerAuth()
 export class DomainGroupController {
-  constructor(
-    private readonly domainGroupService: DomainGroupService,
-  ) {
-  }
+  constructor(private readonly domainGroupService: DomainGroupService) {}
 
   @Post()
   @UseGuards(AuthGuard)

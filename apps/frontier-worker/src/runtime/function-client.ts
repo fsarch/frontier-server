@@ -1,12 +1,11 @@
-import { STATUS_CODES } from 'http';
+import { STATUS_CODES } from 'node:http';
+import { withSpan } from '../tracing/tracing.js';
 import type { RequestType } from '../types/http/request.type.js';
 import type { ResponseType } from '../types/http/response.type.js';
 import { BodyUtils } from '../utils/http/body.utils.js';
 import { CompiledHookFunction, CompiledHooks } from './compiled-config.js';
-import { PostHookExecutionResult, PreHookExecutionResult } from "./function-hooks.js";
-import { PreHookPayload } from './models/pre-hook-payload.js';
 import { PostHookPayload } from './models/post-hook-payload.js';
-import { withSpan } from '../tracing/tracing.js';
+import { PreHookPayload } from './models/pre-hook-payload.js';
 
 // Typ für Hook-Konfiguration
 export type HookConfig = {
@@ -56,7 +55,11 @@ export class FunctionClient {
   public async executeHook(
     hook: CompiledHookFunction,
     hookPayload: PreHookPayload | PostHookPayload,
-  ): Promise<{ statusCode: number; headers: Record<string, string>; body: unknown }> {
+  ): Promise<{
+    statusCode: number;
+    headers: Record<string, string>;
+    body: unknown;
+  }> {
     return withSpan(
       'frontier-worker.functionClient.executeHook',
       async (span) => {
@@ -102,8 +105,10 @@ export class FunctionClient {
           let responseBody: { result?: unknown };
           try {
             responseBody = await response.json();
-          } catch(ex) {
-            this.debug(`failed to parse hook response as JSON: id=${hook.id} status=${response.status}`);
+          } catch (ex) {
+            this.debug(
+              `failed to parse hook response as JSON: id=${hook.id} status=${response.status}`,
+            );
             throw ex;
           }
 
@@ -115,8 +120,11 @@ export class FunctionClient {
             body: responseBody.result,
           };
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          console.error(`[worker][function-client] hook request failed: id=${hook.id} hook=${hook.name} url=${hookUrl} error=${errorMessage}`);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          console.error(
+            `[worker][function-client] hook request failed: id=${hook.id} hook=${hook.name} url=${hookUrl} error=${errorMessage}`,
+          );
           throw error;
         } finally {
           clearTimeout(timeoutId);
@@ -154,11 +162,19 @@ export class FunctionClient {
         );
 
         if (result.statusCode !== 201) {
-          this.debug(`pre-hook unexpected status: id=${hook.id} status=${result.statusCode}`);
-          return invalidPreHookResult(currentRequest, hook, 'Pre-hook returned an unexpected status code.');
+          this.debug(
+            `pre-hook unexpected status: id=${hook.id} status=${result.statusCode}`,
+          );
+          return invalidPreHookResult(
+            currentRequest,
+            hook,
+            'Pre-hook returned an unexpected status code.',
+          );
         }
 
-        const preHookOutcome = extractPreHookOutcome(result.body, (msg) => this.debug(msg));
+        const preHookOutcome = extractPreHookOutcome(result.body, (msg) =>
+          this.debug(msg),
+        );
 
         if (preHookOutcome.kind === 'request') {
           currentRequest = preHookOutcome.request;
@@ -166,7 +182,9 @@ export class FunctionClient {
         }
 
         if (preHookOutcome.kind === 'response') {
-          this.debug(`pre-hook response short-circuit: id=${hook.id} status=${result.statusCode}`);
+          this.debug(
+            `pre-hook response short-circuit: id=${hook.id} status=${result.statusCode}`,
+          );
           return {
             modifiedRequest: currentRequest,
             shortCircuitResponse: preHookOutcome.response,
@@ -174,11 +192,18 @@ export class FunctionClient {
         }
 
         this.debug(`pre-hook invalid result: id=${hook.id}`);
-        return invalidPreHookResult(currentRequest, hook, 'Pre-hook must return either a request or a response.');
+        return invalidPreHookResult(
+          currentRequest,
+          hook,
+          'Pre-hook must return either a request or a response.',
+        );
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         this.debug(`pre-hook execution failed: id=${hook.id}`, error);
-        console.error(`[worker][function-client] pre-hook execution failed: id=${hook.id} error=${errorMessage}`);
+        console.error(
+          `[worker][function-client] pre-hook execution failed: id=${hook.id} error=${errorMessage}`,
+        );
         // Bei Fehlern im Pre-Hook: Fehlermeldung als Response zurückgeben
         return {
           modifiedRequest: currentRequest,
@@ -192,7 +217,7 @@ export class FunctionClient {
             body: await normalizeBody({
               error: `Pre-hook execution failed: ${errorMessage}`,
               hook: hook.id,
-              hookName: hook.name
+              hookName: hook.name,
             }),
             statusText: normalizeStatusText(500),
           },
@@ -221,24 +246,38 @@ export class FunctionClient {
 
         const result = await this.executeHook(
           hook,
-          this.buildPostHookPayload(hook, clientRequestData, upstreamRequestData, currentResponse),
+          this.buildPostHookPayload(
+            hook,
+            clientRequestData,
+            upstreamRequestData,
+            currentResponse,
+          ),
         );
 
         if (result.statusCode !== 201) {
-          this.debug(`post-hook unexpected status: id=${hook.id} status=${result.statusCode}`);
+          this.debug(
+            `post-hook unexpected status: id=${hook.id} status=${result.statusCode}`,
+          );
         }
 
         // Extract response from hook result
-        const postHookOutcome = extractPostHookOutcome(result.body, (msg) => this.debug(msg));
+        const postHookOutcome = extractPostHookOutcome(result.body, (msg) =>
+          this.debug(msg),
+        );
 
         if (postHookOutcome.kind === 'response') {
-          this.debug(`post-hook response modified: id=${hook.id} status=${postHookOutcome.response.statusCode}`);
+          this.debug(
+            `post-hook response modified: id=${hook.id} status=${postHookOutcome.response.statusCode}`,
+          );
           currentResponse = postHookOutcome.response;
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         this.debug(`post-hook execution failed: id=${hook.id}`, error);
-        console.error(`[worker][function-client] post-hook execution failed: id=${hook.id} hook=${hook.name} error=${errorMessage}`);
+        console.error(
+          `[worker][function-client] post-hook execution failed: id=${hook.id} hook=${hook.name} error=${errorMessage}`,
+        );
         // Bei Fehlern im Post-Hook: Generischer Fehler-Header
         // Die Original-Response wird zurückgegeben
       }
@@ -262,7 +301,9 @@ export class FunctionClient {
     }
 
     // Neues Token abrufen
-    this.debug(`fetching new token for client=${cacheKey} from ${config.auth.token_endpoint}`);
+    this.debug(
+      `fetching new token for client=${cacheKey} from ${config.auth.token_endpoint}`,
+    );
 
     const tokenResponse = await fetch(config.auth.token_endpoint, {
       method: 'POST',
@@ -280,10 +321,13 @@ export class FunctionClient {
       throw new Error(`Failed to get access token: ${tokenResponse.status}`);
     }
 
-    const tokenData = await tokenResponse.json() as { access_token?: string; expires_in?: number };
+    const tokenData = (await tokenResponse.json()) as {
+      access_token?: string;
+      expires_in?: number;
+    };
     const accessToken = tokenData.access_token || '';
     const expiresIn = tokenData.expires_in ?? 3600; // Default: 1 Stunde
-    const expiresAt = Date.now() + (expiresIn * 1000);
+    const expiresAt = Date.now() + expiresIn * 1000;
 
     // Token cachen
     tokenCache[cacheKey] = { token: accessToken, expiresAt };
@@ -346,7 +390,10 @@ export class FunctionClient {
 function extractPreHookOutcome(
   body: unknown,
   onDebug?: (message: string) => void,
-): { kind: 'request'; request: RequestType } | { kind: 'response'; response: ResponseType } | { kind: 'invalid' } {
+):
+  | { kind: 'request'; request: RequestType }
+  | { kind: 'response'; response: ResponseType }
+  | { kind: 'invalid' } {
   if (!body || typeof body !== 'object') {
     onDebug?.('pre-hook result is not an object');
     return { kind: 'invalid' };
@@ -409,28 +456,40 @@ async function invalidPreHookResult(
 }
 
 async function normalizeBody(value: unknown): Promise<ResponseType['body']> {
-  if (value && typeof value === 'object' && 'type' in value && 'payload' in value) {
+  if (
+    value &&
+    typeof value === 'object' &&
+    'type' in value &&
+    'payload' in value
+  ) {
     return value as ResponseType['body'];
   }
 
   return BodyUtils.bodyToPlainObject(value ?? null);
 }
 
-function normalizeHeaders(headers: Record<string, string | string[]>): ResponseType['headers'] {
+function normalizeHeaders(
+  headers: Record<string, string | string[]>,
+): ResponseType['headers'] {
   const result: ResponseType['headers'] = {};
 
   for (const [name, value] of Object.entries(headers)) {
-    if (!/^[a-zA-Z0-9\-]+$/.test(name)) {
+    if (!/^[a-zA-Z0-9-]+$/.test(name)) {
       continue;
     }
 
-    result[name.toLowerCase()] = Array.isArray(value) ? value.map((item) => String(item)) : [String(value)];
+    result[name.toLowerCase()] = Array.isArray(value)
+      ? value.map((item) => String(item))
+      : [String(value)];
   }
 
   return result;
 }
 
-function isRequestType(value: unknown, onDebug?: (message: string) => void): value is RequestType {
+function isRequestType(
+  value: unknown,
+  onDebug?: (message: string) => void,
+): value is RequestType {
   if (!value || typeof value !== 'object') {
     onDebug?.('isRequestType: value is not an object');
     return false;
@@ -443,11 +502,16 @@ function isRequestType(value: unknown, onDebug?: (message: string) => void): val
   const bodyOk = isBodyType(candidate.body);
   const ok = methodOk && urlOk && headersOk && bodyOk;
 
-  onDebug?.(`isRequestType: ${ok ? 'match' : 'no match'} method=${methodOk} url=${urlOk} headers=${headersOk} body=${bodyOk}`);
+  onDebug?.(
+    `isRequestType: ${ok ? 'match' : 'no match'} method=${methodOk} url=${urlOk} headers=${headersOk} body=${bodyOk}`,
+  );
   return ok;
 }
 
-function isResponseType(value: unknown, onDebug?: (message: string) => void): value is ResponseType {
+function isResponseType(
+  value: unknown,
+  onDebug?: (message: string) => void,
+): value is ResponseType {
   if (!value || typeof value !== 'object') {
     onDebug?.('isResponseType: value is not an object');
     return false;
@@ -460,7 +524,9 @@ function isResponseType(value: unknown, onDebug?: (message: string) => void): va
   const bodyOk = isBodyType(candidate.body);
   const ok = statusCodeOk && statusTextOk && headersOk && bodyOk;
 
-  onDebug?.(`isResponseType: ${ok ? 'match' : 'no match'} statusCode=${statusCodeOk} statusText=${statusTextOk} headers=${headersOk} body=${bodyOk}`);
+  onDebug?.(
+    `isResponseType: ${ok ? 'match' : 'no match'} statusCode=${statusCodeOk} statusText=${statusTextOk} headers=${headersOk} body=${bodyOk}`,
+  );
   return ok;
 }
 
@@ -484,7 +550,10 @@ function isQueryParams(value: unknown): boolean {
     return false;
   }
 
-  return Object.values(value as Record<string, unknown>).every((item) => Array.isArray(item) && item.every((entry) => typeof entry === 'string'));
+  return Object.values(value as Record<string, unknown>).every(
+    (item) =>
+      Array.isArray(item) && item.every((entry) => typeof entry === 'string'),
+  );
 }
 
 function isHeadersType(value: unknown): value is ResponseType['headers'] {
@@ -492,7 +561,10 @@ function isHeadersType(value: unknown): value is ResponseType['headers'] {
     return false;
   }
 
-  return Object.values(value as Record<string, unknown>).every((item) => Array.isArray(item) && item.every((entry) => typeof entry === 'string'));
+  return Object.values(value as Record<string, unknown>).every(
+    (item) =>
+      Array.isArray(item) && item.every((entry) => typeof entry === 'string'),
+  );
 }
 
 function isBodyType(value: unknown): value is ResponseType['body'] {
@@ -508,7 +580,11 @@ function isBodyType(value: unknown): value is ResponseType['body'] {
     return false;
   }
 
-  if (value.type !== 'json' && value.type !== 'text' && value.type !== 'binary.uint8array') {
+  if (
+    value.type !== 'json' &&
+    value.type !== 'text' &&
+    value.type !== 'binary.uint8array'
+  ) {
     return false;
   }
 
@@ -518,7 +594,10 @@ function isBodyType(value: unknown): value is ResponseType['body'] {
 
   // Text and binary payloads must be strings on the wire (binary is base64-encoded, see
   // BinaryUint8ArrayBodyType) - a hook echoing back something else means it mangled the body.
-  if ((value.type === 'text' || value.type === 'binary.uint8array') && typeof (value as { payload: unknown }).payload !== 'string') {
+  if (
+    (value.type === 'text' || value.type === 'binary.uint8array') &&
+    typeof (value as { payload: unknown }).payload !== 'string'
+  ) {
     return false;
   }
 
@@ -534,5 +613,9 @@ function isDebugEnabled(value: string | undefined): boolean {
     return false;
   }
 
-  return value === '1' || value.toLowerCase() === 'true' || value.toLowerCase() === 'debug';
+  return (
+    value === '1' ||
+    value.toLowerCase() === 'true' ||
+    value.toLowerCase() === 'debug'
+  );
 }

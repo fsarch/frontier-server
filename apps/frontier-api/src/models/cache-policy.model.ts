@@ -1,6 +1,6 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { CachePolicy } from "../database/entities/cache-policy.entity.js";
-import { Optional } from "@nestjs/common";
+import { Optional } from '@nestjs/common';
+import { ApiProperty } from '@nestjs/swagger';
+import { CachePolicy } from '../database/entities/cache-policy.entity.js';
 
 export class CachePolicyDto {
   static FromDbo(dbo: CachePolicy) {
@@ -10,15 +10,10 @@ export class CachePolicyDto {
     dto.name = dbo.name;
     dto.enableCacheTags = dbo.enableCacheTags;
     dto.cacheTagsHeader = dbo.cacheTagsHeader;
-    dto.defaultTTL = dbo.defaultTTL !== null
-      ? parseInt(dbo.defaultTTL as any, 10)
-      : null;
-    dto.minTTL = dbo.minTTL !== null
-      ? parseInt(dbo.minTTL as any, 10)
-      : null;
-    dto.maxTTL = dbo.maxTTL !== null
-      ? parseInt(dbo.maxTTL as any, 10)
-      : null;
+    dto.defaultTTL =
+      dbo.defaultTTL !== null ? parseInt(dbo.defaultTTL as any, 10) : null;
+    dto.minTTL = dbo.minTTL !== null ? parseInt(dbo.minTTL as any, 10) : null;
+    dto.maxTTL = dbo.maxTTL !== null ? parseInt(dbo.maxTTL as any, 10) : null;
     dto.divergenceCookies = dbo.divergenceCookies;
     dto.divergenceHeaders = dbo.divergenceHeaders;
     dto.divergenceQueryParameters = dbo.divergenceQueryParameters;
@@ -74,7 +69,6 @@ export class CachePolicyDto {
 }
 
 export class CachePolicyCreateDto {
-
   @ApiProperty()
   name: string;
 

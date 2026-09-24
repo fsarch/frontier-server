@@ -1,7 +1,7 @@
-import { FrontierApiModule } from "./frontier-api.module.js";
+import { FsArchAppBuilder } from '@fsarch/server';
 import { WsAdapter } from '@nestjs/platform-ws';
-import { FsArchAppBuilder } from "@fsarch/server";
-import { DATABASE_OPTIONS } from "./database/index.js";
+import { DATABASE_OPTIONS } from './database/index.js';
+import { FrontierApiModule } from './frontier-api.module.js';
 
 async function bootstrap() {
   const app = await new FsArchAppBuilder(FrontierApiModule, {
@@ -10,7 +10,8 @@ async function bootstrap() {
   })
     .addSwagger({
       title: 'Frontier-API-Server',
-      description: 'The Frontier API-Server is a utility service for configuring and managing the frontier-workers',
+      description:
+        'The Frontier API-Server is a utility service for configuring and managing the frontier-workers',
       version: '1.0',
     })
     .enableAuth()
@@ -23,5 +24,3 @@ async function bootstrap() {
 }
 
 bootstrap();
-
-

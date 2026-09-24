@@ -1,13 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  parseCacheControl,
-  serializeCacheControl,
   applyCachePolicyToResponse,
-  type CompiledCachePolicy,
-  type ResponseType,
   type BodyType,
+  type CompiledCachePolicy,
+  parseCacheControl,
+  type ResponseType,
+  serializeCacheControl,
 } from './cache-control.utils.js';
-import type { JsonBodyType } from '../../types/http/shared.type.js';
 
 describe('CacheControlUtils', () => {
   describe('parseCacheControl', () => {
@@ -139,7 +138,7 @@ describe('CacheControlUtils', () => {
 
     it('should parse complex header with multiple directives', () => {
       const result = parseCacheControl(
-        'public, max-age=3600, s-maxage=7200, must-revalidate, no-transform'
+        'public, max-age=3600, s-maxage=7200, must-revalidate, no-transform',
       );
       expect(result.public).toBe(true);
       expect(result['max-age']).toBe(3600);
@@ -182,13 +181,16 @@ describe('CacheControlUtils', () => {
 
     it('should skip false values', () => {
       expect(serializeCacheControl({ public: false, 'max-age': 3600 })).toBe(
-        'max-age=3600'
+        'max-age=3600',
       );
     });
 
     it('should skip undefined values', () => {
       expect(
-        serializeCacheControl({ public: undefined, 'max-age': 3600 } as ParsedCacheControl)
+        serializeCacheControl({
+          public: undefined,
+          'max-age': 3600,
+        } as ParsedCacheControl),
       ).toBe('max-age=3600');
     });
 
@@ -252,8 +254,14 @@ describe('CacheControlUtils', () => {
       const serialized = serializeCacheControl(parsed);
 
       // The order might differ but content should be the same
-      const normalizedOriginal = original.split(',').map((s) => s.trim()).sort();
-      const normalizedSerialized = serialized.split(',').map((s) => s.trim()).sort();
+      const normalizedOriginal = original
+        .split(',')
+        .map((s) => s.trim())
+        .sort();
+      const normalizedSerialized = serialized
+        .split(',')
+        .map((s) => s.trim())
+        .sort();
 
       expect(normalizedSerialized).toEqual(normalizedOriginal);
     });
@@ -277,7 +285,7 @@ describe('CacheControlUtils', () => {
   describe('applyCachePolicyToResponse', () => {
     const createResponse = (
       headers: Record<string, string[]> = {},
-      body: BodyType = { type: 'json', payload: null }
+      body: BodyType = { type: 'json', payload: null },
     ): ResponseType<BodyType> => ({
       type: 'response',
       statusCode: 200,
@@ -287,7 +295,7 @@ describe('CacheControlUtils', () => {
     });
 
     const createCachePolicy = (
-      overrides: Partial<CompiledCachePolicy> = {}
+      overrides: Partial<CompiledCachePolicy> = {},
     ): CompiledCachePolicy => ({
       enabled: true,
       cachePolicyId: 'test-policy',
@@ -343,7 +351,9 @@ describe('CacheControlUtils', () => {
     });
 
     it('should use defaultTTL when cache-control has no max-age', () => {
-      const response = createResponse({ 'cache-control': ['public, must-revalidate'] });
+      const response = createResponse({
+        'cache-control': ['public, must-revalidate'],
+      });
       const cachePolicy = createCachePolicy({ defaultTTL: 7200 });
 
       const result = applyCachePolicyToResponse(response, cachePolicy);
@@ -364,7 +374,9 @@ describe('CacheControlUtils', () => {
     });
 
     it('should preserve other directives when updating max-age', () => {
-      const response = createResponse({ 'cache-control': ['private, no-transform'] });
+      const response = createResponse({
+        'cache-control': ['private, no-transform'],
+      });
       const cachePolicy = createCachePolicy();
 
       const result = applyCachePolicyToResponse(response, cachePolicy);

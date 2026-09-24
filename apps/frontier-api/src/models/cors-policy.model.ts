@@ -69,4 +69,3 @@ export class CorsPolicyUpdateDto {
   @Optional()
   allowedOrigins?: string[];
 }
-

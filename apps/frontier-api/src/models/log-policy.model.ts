@@ -10,7 +10,10 @@ export class LogPolicyDto {
     dto.domainGroupId = dbo.domainGroupId;
     dto.name = dbo.name;
     dto.enabled = dbo.enabled;
-    dto.retentionTimeSeconds = parseInt(dbo.retentionTimeSeconds as unknown as string, 10);
+    dto.retentionTimeSeconds = parseInt(
+      dbo.retentionTimeSeconds as unknown as string,
+      10,
+    );
 
     return dto;
   }
@@ -57,4 +60,3 @@ export class LogPolicyUpdateDto {
   @Optional()
   retentionTimeSeconds?: number;
 }
-

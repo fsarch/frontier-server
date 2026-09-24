@@ -1,9 +1,9 @@
-import { PostHookPayload } from '../models/post-hook-payload.js';
-import { BodyUtils } from '../../utils/http/body.utils.js';
-import { gzip as zlibGzip } from 'zlib';
-import { promisify } from 'util';
+import { promisify } from 'node:util';
+import { gzip as zlibGzip } from 'node:zlib';
 import type { ResponseType } from '../../types/http/response.type.js';
 import type { HeadersType } from '../../types/http/shared.type.js';
+import { BodyUtils } from '../../utils/http/body.utils.js';
+import { PostHookPayload } from '../models/post-hook-payload.js';
 
 const gzipAsync = promisify(zlibGzip);
 
@@ -51,7 +51,10 @@ function isCompressibleContentType(contentType: string): boolean {
  * Read the first value of a header (headers are stored as string[] to support
  * headers such as Set-Cookie that may legitimately occur more than once).
  */
-function getHeaderValue(headers: HeadersType, name: string): string | undefined {
+function getHeaderValue(
+  headers: HeadersType,
+  name: string,
+): string | undefined {
   return headers[name]?.[0];
 }
 
@@ -82,7 +85,8 @@ export async function compressResponseBody(
   // set an explicit content-length and drop any transfer-encoding/content-encoding inherited from
   // the upstream response. Sending both content-length and transfer-encoding is a protocol
   // violation that clients/parsers will reject.
-  const rawSize = bodyToSend === null ? 0 : Buffer.byteLength(bodyToSend, 'utf8');
+  const rawSize =
+    bodyToSend === null ? 0 : Buffer.byteLength(bodyToSend, 'utf8');
   headers['content-length'] = [rawSize.toString()];
   delete headers['content-encoding'];
   delete headers['transfer-encoding'];
@@ -94,7 +98,9 @@ export async function compressResponseBody(
   }
 
   // Check if the content type is compressible
-  const contentType = extractContentType(getHeaderValue(headers, 'content-type'));
+  const contentType = extractContentType(
+    getHeaderValue(headers, 'content-type'),
+  );
   const isCompressible = isCompressibleContentType(contentType);
   onDebug?.(`content-type: ${contentType}, compressible: ${isCompressible}`);
 
@@ -117,11 +123,15 @@ export async function compressResponseBody(
 
     // Update vary header
     const vary = getHeaderValue(headers, 'vary');
-    headers['vary'] = vary
-      ? (vary.includes('Accept-Encoding') ? [vary] : [`${vary}, Accept-Encoding`])
+    headers.vary = vary
+      ? vary.includes('Accept-Encoding')
+        ? [vary]
+        : [`${vary}, Accept-Encoding`]
       : ['Accept-Encoding'];
 
-    onDebug?.(`compressed response from ${rawSize} to ${compressed.length} bytes`);
+    onDebug?.(
+      `compressed response from ${rawSize} to ${compressed.length} bytes`,
+    );
     return {
       ...response,
       headers,
@@ -129,7 +139,9 @@ export async function compressResponseBody(
     };
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : String(e);
-    onDebug?.(`compression failed: ${errorMessage}, sending uncompressed as fallback`);
+    onDebug?.(
+      `compression failed: ${errorMessage}, sending uncompressed as fallback`,
+    );
     console.error('[worker][compression.hook] compression failed:', e);
     return { ...response, headers, body: response.body };
   }

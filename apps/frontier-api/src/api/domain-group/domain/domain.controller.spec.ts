@@ -1,8 +1,8 @@
+import { AuthGuard } from '@fsarch/server/auth';
+import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DomainController } from './domain.controller';
 import { DomainService } from './domain.service';
-import { AuthGuard } from '@fsarch/server/auth';
-import { Reflector } from '@nestjs/core';
 
 describe.skip('DomainController', () => {
   let controller: DomainController;

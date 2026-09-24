@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { DomainService } from './domain.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DomainGroupDomain } from '../../../database/entities/domain-group-domain.entity.js';
+import { DomainService } from './domain.service';
 
 describe('DomainService', () => {
   let service: DomainService;

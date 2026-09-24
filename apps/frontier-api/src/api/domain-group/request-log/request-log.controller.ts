@@ -1,10 +1,13 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@fsarch/server/auth';
 import { Roles } from '@fsarch/server/uac';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Role } from '../../../constants/role.enum.js';
+import {
+  RequestLogDto,
+  RequestLogQueryDto,
+} from '../../../models/request-log.model.js';
 import { RequestLogService } from './request-log.service.js';
-import { RequestLogDto, RequestLogQueryDto } from '../../../models/request-log.model.js';
-import { Role } from "../../../constants/role.enum.js";
 
 @ApiTags('request-logs')
 @Controller({
@@ -13,10 +16,7 @@ import { Role } from "../../../constants/role.enum.js";
 })
 @ApiBearerAuth()
 export class RequestLogController {
-  constructor(
-    private readonly requestLogService: RequestLogService,
-  ) {
-  }
+  constructor(private readonly requestLogService: RequestLogService) {}
 
   @Get()
   @UseGuards(AuthGuard)
@@ -25,9 +25,11 @@ export class RequestLogController {
     @Param('domainGroupId') domainGroupId: string,
     @Query() query: RequestLogQueryDto,
   ) {
-    const logs = await this.requestLogService.ListByDomainGroupId(domainGroupId, query);
+    const logs = await this.requestLogService.ListByDomainGroupId(
+      domainGroupId,
+      query,
+    );
 
     return logs.map(RequestLogDto.FromDbo);
   }
 }
-

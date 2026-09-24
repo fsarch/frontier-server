@@ -1,5 +1,8 @@
 import WebSocket from 'ws';
-import { BootstrapReply, WorkerConfigSnapshot } from '../types/worker-config.types.js';
+import {
+  BootstrapReply,
+  WorkerConfigSnapshot,
+} from '../types/worker-config.types.js';
 
 type PendingMessage = {
   resolve: (value: unknown) => void;
@@ -11,7 +14,10 @@ type ControlPlaneClientOptions = {
   url: string;
   authToken: string;
   heartbeatIntervalMs: number;
-  onSnapshot: (version: number, snapshot: WorkerConfigSnapshot) => Promise<void> | void;
+  onSnapshot: (
+    version: number,
+    snapshot: WorkerConfigSnapshot,
+  ) => Promise<void> | void;
   collectHeartbeatPayload: () => Record<string, unknown>;
   logger?: Pick<Console, 'log' | 'warn' | 'error'>;
 };
@@ -75,17 +81,32 @@ export class ControlPlaneClient {
 
       try {
         this.logInfo('requesting bootstrap snapshot');
-        const bootstrapReply = await this.sendWithReply<BootstrapReply>('bootstrap', null);
-        this.logInfo(`received bootstrap snapshot (version=${bootstrapReply.version})`);
-        await this.options.onSnapshot(bootstrapReply.version, bootstrapReply.snapshot);
-        this.logInfo(`applied bootstrap snapshot (version=${bootstrapReply.version})`);
+        const bootstrapReply = await this.sendWithReply<BootstrapReply>(
+          'bootstrap',
+          null,
+        );
+        this.logInfo(
+          `received bootstrap snapshot (version=${bootstrapReply.version})`,
+        );
+        await this.options.onSnapshot(
+          bootstrapReply.version,
+          bootstrapReply.snapshot,
+        );
+        this.logInfo(
+          `applied bootstrap snapshot (version=${bootstrapReply.version})`,
+        );
       } catch (error) {
-        this.logError('bootstrap request failed; closing websocket to trigger reconnect', error);
+        this.logError(
+          'bootstrap request failed; closing websocket to trigger reconnect',
+          error,
+        );
         ws.close();
         return;
       }
 
-      this.logInfo(`starting heartbeat interval (${this.options.heartbeatIntervalMs}ms)`);
+      this.logInfo(
+        `starting heartbeat interval (${this.options.heartbeatIntervalMs}ms)`,
+      );
       this.heartbeatTimer = setInterval(() => {
         this.sendWithReply('heartbeat', this.options.collectHeartbeatPayload())
           .then(() => {
@@ -99,9 +120,13 @@ export class ControlPlaneClient {
 
     ws.on('message', async (rawMessage) => {
       try {
-        const message = JSON.parse(rawMessage.toString()) as Record<string, unknown>;
+        const message = JSON.parse(rawMessage.toString()) as Record<
+          string,
+          unknown
+        >;
 
-        const replyTo = typeof message.replyTo === 'string' ? message.replyTo : null;
+        const replyTo =
+          typeof message.replyTo === 'string' ? message.replyTo : null;
 
         if (replyTo && this.pending.has(replyTo)) {
           const pending = this.pending.get(replyTo)!;
@@ -148,8 +173,13 @@ export class ControlPlaneClient {
     }
 
     this.reconnectAttempt += 1;
-    const delay = Math.min(1000 * (2 ** this.reconnectAttempt), this.reconnectMaxDelayMs);
-    this.logWarn(`scheduling reconnect attempt ${this.reconnectAttempt} in ${delay}ms`);
+    const delay = Math.min(
+      1000 * 2 ** this.reconnectAttempt,
+      this.reconnectMaxDelayMs,
+    );
+    this.logWarn(
+      `scheduling reconnect attempt ${this.reconnectAttempt} in ${delay}ms`,
+    );
 
     this.reconnectTimer = setTimeout(() => {
       this.logInfo(`running reconnect attempt ${this.reconnectAttempt}`);
@@ -177,13 +207,15 @@ export class ControlPlaneClient {
         timeout,
       });
 
-      this.ws?.send(JSON.stringify({
-        event,
-        data: {
-          id,
-          payload,
-        },
-      }));
+      this.ws?.send(
+        JSON.stringify({
+          event,
+          data: {
+            id,
+            payload,
+          },
+        }),
+      );
 
       this.logInfo(`sent control-plane event (event=${event}, id=${id})`);
     });
@@ -209,4 +241,3 @@ export class ControlPlaneClient {
     this.logger.error(`[control-plane] ${message}`, error);
   }
 }
-

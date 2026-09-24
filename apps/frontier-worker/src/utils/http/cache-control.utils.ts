@@ -1,8 +1,7 @@
 /**
  * Cache-Control Header Parsing und Serialisierung Utilities
  */
-import type { HeadersType } from '../../types/http/shared.type.js';
-import type { BodyType } from '../../types/http/shared.type.js';
+import type { BodyType, HeadersType } from '../../types/http/shared.type.js';
 
 /**
  * Geparste Cache-Control Direktiven
@@ -62,11 +61,7 @@ const BOOLEAN_DIRECTIVES = new Set([
 /**
  * Numeric Direktiven (erwarten einen Integer Wert)
  */
-const NUMERIC_DIRECTIVES = new Set([
-  'max-age',
-  's-maxage',
-  'min-fresh',
-]);
+const NUMERIC_DIRECTIVES = new Set(['max-age', 's-maxage', 'min-fresh']);
 
 /**
  * Standard-Reihenfolge für Cache-Control Direktiven
@@ -102,7 +97,9 @@ function parseNonNegativeInteger(value: string): number | null {
  * @param headerValue - Der Cache-Control Header Wert als String
  * @returns Geparste Direktiven als Object
  */
-export function parseCacheControl(headerValue: string | undefined): ParsedCacheControl {
+export function parseCacheControl(
+  headerValue: string | undefined,
+): ParsedCacheControl {
   const directives: ParsedCacheControl = {};
 
   if (!headerValue || typeof headerValue !== 'string') {
@@ -172,16 +169,28 @@ export function serializeCacheControl(directives: ParsedCacheControl): string {
     const value = directives[key as keyof ParsedCacheControl];
     if (value === true) {
       parts.push(key);
-    } else if (value !== undefined && value !== false && typeof value === 'number') {
+    } else if (
+      value !== undefined &&
+      value !== false &&
+      typeof value === 'number'
+    ) {
       parts.push(`${key}=${value}`);
-    } else if (value !== undefined && value !== false && typeof value === 'string') {
+    } else if (
+      value !== undefined &&
+      value !== false &&
+      typeof value === 'string'
+    ) {
       parts.push(`${key}=${value}`);
     }
   }
 
   // Add any other directives not in standard order
   for (const [key, value] of Object.entries(directives)) {
-    if (!STANDARD_DIRECTIVE_ORDER.includes(key) && value !== undefined && value !== false) {
+    if (
+      !STANDARD_DIRECTIVE_ORDER.includes(key) &&
+      value !== undefined &&
+      value !== false
+    ) {
       const displayValue = value === true ? '' : `=${value}`;
       parts.push(`${key}${displayValue}`);
     }
@@ -242,7 +251,7 @@ export function applyCachePolicyToResponse<TBody extends BodyType | null>(
     if (cachePolicy.minTTL !== undefined && maxAge < cachePolicy.minTTL) {
       maxAge = cachePolicy.minTTL;
     }
-    if (cachePolicy.maxTTL !== undefined  && maxAge > cachePolicy.maxTTL) {
+    if (cachePolicy.maxTTL !== undefined && maxAge > cachePolicy.maxTTL) {
       maxAge = cachePolicy.maxTTL;
     }
   }

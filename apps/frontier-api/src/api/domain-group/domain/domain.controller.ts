@@ -1,10 +1,13 @@
+import { AuthGuard } from '@fsarch/server/auth';
+import { Roles } from '@fsarch/server/uac';
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import { AuthGuard } from "@fsarch/server/auth";
-import { Roles } from "@fsarch/server/uac";
-import { DomainGroupDomainCreateDto, DomainGroupDomainDto } from "../../../models/domain-group-domain.model.js";
-import { DomainService } from "./domain.service.js";
-import { Role } from "../../../constants/role.enum.js";
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Role } from '../../../constants/role.enum.js';
+import {
+  DomainGroupDomainCreateDto,
+  DomainGroupDomainDto,
+} from '../../../models/domain-group-domain.model.js';
+import { DomainService } from './domain.service.js';
 
 @ApiTags('domain')
 @Controller({
@@ -13,9 +16,7 @@ import { Role } from "../../../constants/role.enum.js";
 })
 @ApiBearerAuth()
 export class DomainController {
-  constructor(
-    private readonly domainGroupDomainService: DomainService
-  ) {}
+  constructor(private readonly domainGroupDomainService: DomainService) {}
 
   @Post()
   @UseGuards(AuthGuard)
@@ -33,12 +34,9 @@ export class DomainController {
   @Get()
   @UseGuards(AuthGuard)
   @Roles(Role.manage)
-  public async List(
-    @Param('domainGroupId') domainGroupId: string,
-  ) {
-    const domains = await this.domainGroupDomainService.ListByDomainGroupId(
-      domainGroupId,
-    );
+  public async List(@Param('domainGroupId') domainGroupId: string) {
+    const domains =
+      await this.domainGroupDomainService.ListByDomainGroupId(domainGroupId);
 
     return domains.map(DomainGroupDomainDto.FromDbo);
   }

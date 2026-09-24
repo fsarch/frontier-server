@@ -1,10 +1,24 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@fsarch/server/auth';
 import { Roles } from '@fsarch/server/uac';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Role } from '../../../constants/role.enum.js';
+import {
+  CorsPolicyCreateDto,
+  CorsPolicyDto,
+  CorsPolicyUpdateDto,
+} from '../../../models/cors-policy.model.js';
 import { CorsPolicyService } from './cors-policy.service.js';
-import { CorsPolicyCreateDto, CorsPolicyDto, CorsPolicyUpdateDto } from '../../../models/cors-policy.model.js';
-import { Role } from "../../../constants/role.enum.js";
 
 @ApiTags('cors-policies')
 @Controller({
@@ -13,10 +27,7 @@ import { Role } from "../../../constants/role.enum.js";
 })
 @ApiBearerAuth()
 export class CorsPolicyController {
-  constructor(
-    private readonly corsPolicyService: CorsPolicyService,
-  ) {
-  }
+  constructor(private readonly corsPolicyService: CorsPolicyService) {}
 
   @Post()
   @UseGuards(AuthGuard)
@@ -31,10 +42,9 @@ export class CorsPolicyController {
   @Get()
   @UseGuards(AuthGuard)
   @Roles(Role.manage)
-  public async List(
-    @Param('domainGroupId') domainGroupId: string,
-  ) {
-    const corsPolicies = await this.corsPolicyService.ListByDomainGroupId(domainGroupId);
+  public async List(@Param('domainGroupId') domainGroupId: string) {
+    const corsPolicies =
+      await this.corsPolicyService.ListByDomainGroupId(domainGroupId);
 
     return corsPolicies.map(CorsPolicyDto.FromDbo);
   }
@@ -59,7 +69,11 @@ export class CorsPolicyController {
     @Param('id') id: string,
     @Body() corsPolicyUpdateDto: CorsPolicyUpdateDto,
   ) {
-    const updated = await this.corsPolicyService.Update(id, domainGroupId, corsPolicyUpdateDto);
+    const updated = await this.corsPolicyService.Update(
+      id,
+      domainGroupId,
+      corsPolicyUpdateDto,
+    );
 
     return CorsPolicyDto.FromDbo(updated);
   }
@@ -75,4 +89,3 @@ export class CorsPolicyController {
     await this.corsPolicyService.Delete(id, domainGroupId);
   }
 }
-

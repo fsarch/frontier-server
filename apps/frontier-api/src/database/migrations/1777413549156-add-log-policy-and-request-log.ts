@@ -1,7 +1,16 @@
-import { MigrationInterface, QueryRunner, Table, TableColumn, TableForeignKey, TableIndex } from 'typeorm';
+import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  TableColumn,
+  TableForeignKey,
+  TableIndex,
+} from 'typeorm';
 import { getDataType } from './utils/data-type.mapper.js';
 
-export class AddLogPolicyAndRequestLog1777413549156 implements MigrationInterface {
+export class AddLogPolicyAndRequestLog1777413549156
+  implements MigrationInterface
+{
   name = 'AddLogPolicyAndRequestLog1777413549156';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -52,40 +61,53 @@ export class AddLogPolicyAndRequestLog1777413549156 implements MigrationInterfac
             isNullable: true,
           },
         ],
-        foreignKeys: [{
-          name: 'fk__log_policy__domain_group_id',
-          onUpdate: 'NO ACTION',
-          onDelete: 'NO ACTION',
-          columnNames: ['domain_group_id'],
-          referencedColumnNames: ['id'],
-          referencedTableName: 'domain_group',
-        }],
-        indices: [{
-          name: 'IDX__log_policy__domain_group_id',
-          columnNames: ['domain_group_id'],
-        }],
+        foreignKeys: [
+          {
+            name: 'fk__log_policy__domain_group_id',
+            onUpdate: 'NO ACTION',
+            onDelete: 'NO ACTION',
+            columnNames: ['domain_group_id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'domain_group',
+          },
+        ],
+        indices: [
+          {
+            name: 'IDX__log_policy__domain_group_id',
+            columnNames: ['domain_group_id'],
+          },
+        ],
       }),
     );
 
-    await queryRunner.addColumn('path_rule', new TableColumn({
-      name: 'log_policy_id',
-      type: 'uuid',
-      isNullable: true,
-    }));
+    await queryRunner.addColumn(
+      'path_rule',
+      new TableColumn({
+        name: 'log_policy_id',
+        type: 'uuid',
+        isNullable: true,
+      }),
+    );
 
-    await queryRunner.createForeignKey('path_rule', new TableForeignKey({
-      name: 'fk__path_rule__log_policy_id',
-      onUpdate: 'NO ACTION',
-      onDelete: 'SET NULL',
-      columnNames: ['log_policy_id'],
-      referencedColumnNames: ['id'],
-      referencedTableName: 'log_policy',
-    }));
+    await queryRunner.createForeignKey(
+      'path_rule',
+      new TableForeignKey({
+        name: 'fk__path_rule__log_policy_id',
+        onUpdate: 'NO ACTION',
+        onDelete: 'SET NULL',
+        columnNames: ['log_policy_id'],
+        referencedColumnNames: ['id'],
+        referencedTableName: 'log_policy',
+      }),
+    );
 
-    await queryRunner.createIndex('path_rule', new TableIndex({
-      name: 'IDX__path_rule__log_policy_id',
-      columnNames: ['log_policy_id'],
-    }));
+    await queryRunner.createIndex(
+      'path_rule',
+      new TableIndex({
+        name: 'IDX__path_rule__log_policy_id',
+        columnNames: ['log_policy_id'],
+      }),
+    );
 
     await queryRunner.createTable(
       new Table({
@@ -168,44 +190,54 @@ export class AddLogPolicyAndRequestLog1777413549156 implements MigrationInterfac
             default: 'now()',
           },
         ],
-        foreignKeys: [{
-          name: 'fk__request_log__domain_group_id',
-          onUpdate: 'NO ACTION',
-          onDelete: 'NO ACTION',
-          columnNames: ['domain_group_id'],
-          referencedColumnNames: ['id'],
-          referencedTableName: 'domain_group',
-        }, {
-          name: 'fk__request_log__path_rule_id',
-          onUpdate: 'NO ACTION',
-          onDelete: 'NO ACTION',
-          columnNames: ['path_rule_id'],
-          referencedColumnNames: ['id'],
-          referencedTableName: 'path_rule',
-        }, {
-          name: 'fk__request_log__log_policy_id',
-          onUpdate: 'NO ACTION',
-          onDelete: 'NO ACTION',
-          columnNames: ['log_policy_id'],
-          referencedColumnNames: ['id'],
-          referencedTableName: 'log_policy',
-        }],
-        indices: [{
-          name: 'IDX__request_log__domain_group_id',
-          columnNames: ['domain_group_id'],
-        }, {
-          name: 'IDX__request_log__path_rule_id',
-          columnNames: ['path_rule_id'],
-        }, {
-          name: 'IDX__request_log__log_policy_id',
-          columnNames: ['log_policy_id'],
-        }, {
-          name: 'IDX__request_log__creation_time',
-          columnNames: ['creation_time'],
-        }, {
-          name: 'IDX__request_log__expiration_time',
-          columnNames: ['expiration_time'],
-        }],
+        foreignKeys: [
+          {
+            name: 'fk__request_log__domain_group_id',
+            onUpdate: 'NO ACTION',
+            onDelete: 'NO ACTION',
+            columnNames: ['domain_group_id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'domain_group',
+          },
+          {
+            name: 'fk__request_log__path_rule_id',
+            onUpdate: 'NO ACTION',
+            onDelete: 'NO ACTION',
+            columnNames: ['path_rule_id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'path_rule',
+          },
+          {
+            name: 'fk__request_log__log_policy_id',
+            onUpdate: 'NO ACTION',
+            onDelete: 'NO ACTION',
+            columnNames: ['log_policy_id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'log_policy',
+          },
+        ],
+        indices: [
+          {
+            name: 'IDX__request_log__domain_group_id',
+            columnNames: ['domain_group_id'],
+          },
+          {
+            name: 'IDX__request_log__path_rule_id',
+            columnNames: ['path_rule_id'],
+          },
+          {
+            name: 'IDX__request_log__log_policy_id',
+            columnNames: ['log_policy_id'],
+          },
+          {
+            name: 'IDX__request_log__creation_time',
+            columnNames: ['creation_time'],
+          },
+          {
+            name: 'IDX__request_log__expiration_time',
+            columnNames: ['expiration_time'],
+          },
+        ],
       }),
     );
   }
@@ -214,8 +246,12 @@ export class AddLogPolicyAndRequestLog1777413549156 implements MigrationInterfac
     await queryRunner.dropTable('request_log');
 
     const pathRuleTable = await queryRunner.getTable('path_rule');
-    const logPolicyForeignKey = pathRuleTable?.foreignKeys.find((foreignKey) => foreignKey.name === 'fk__path_rule__log_policy_id');
-    const logPolicyIndex = pathRuleTable?.indices.find((index) => index.name === 'IDX__path_rule__log_policy_id');
+    const logPolicyForeignKey = pathRuleTable?.foreignKeys.find(
+      (foreignKey) => foreignKey.name === 'fk__path_rule__log_policy_id',
+    );
+    const logPolicyIndex = pathRuleTable?.indices.find(
+      (index) => index.name === 'IDX__path_rule__log_policy_id',
+    );
 
     if (logPolicyIndex) {
       await queryRunner.dropIndex('path_rule', logPolicyIndex);
@@ -229,4 +265,3 @@ export class AddLogPolicyAndRequestLog1777413549156 implements MigrationInterfac
     await queryRunner.dropTable('log_policy');
   }
 }
-

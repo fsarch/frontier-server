@@ -1,15 +1,18 @@
+import { Public } from '@fsarch/server/auth';
+import { ModuleConfigurationService } from '@fsarch/server/configuration';
+import { Span } from '@fsarch/server/tracing';
+import { Inject, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import {
   OnGatewayConnection,
   SubscribeMessage,
-  WebSocketGateway
+  WebSocketGateway,
 } from '@nestjs/websockets';
-import { Inject, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { WebSocket } from "ws";
-import { ModuleConfigurationService } from '@fsarch/server/configuration';
-import { Span } from '@fsarch/server/tracing';
-import { Public } from '@fsarch/server/auth';
-import { ConfigWorkersType } from "../../../types/config.type.js";
-import { WorkerBootstrapService, WorkerConfigSnapshot } from '../worker-bootstrap.service.js';
+import { WebSocket } from 'ws';
+import { ConfigWorkersType } from '../../../types/config.type.js';
+import {
+  WorkerBootstrapService,
+  WorkerConfigSnapshot,
+} from '../worker-bootstrap.service.js';
 
 type WebSocketResponseMessage<T> = {
   replyTo: string;
@@ -18,10 +21,12 @@ type WebSocketResponseMessage<T> = {
 
 @WebSocketGateway({
   transports: 'websocket',
-  path: '/api/workers/websocket'
+  path: '/api/workers/websocket',
 })
 @Public()
-export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnModuleDestroy {
+export class WebsocketGateway
+  implements OnGatewayConnection, OnModuleInit, OnModuleDestroy
+{
   private readonly clients = new Set<WebSocket>();
   private configVersion = 0;
   private configChecksum = '';
@@ -32,8 +37,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
     @Inject('WORKERS_CONFIG')
     private readonly workersConfigService: ModuleConfigurationService<ConfigWorkersType>,
     private readonly bootstrapService: WorkerBootstrapService,
-  ) {
-  }
+  ) {}
 
   private get configCheckIntervalMs() {
     return this.workersConfigService.get('websocket').config_check_interval_ms;
@@ -44,12 +48,10 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
   }
 
   public onModuleInit() {
-    this.syncAndBroadcastConfig(false)
-      .catch(() => null);
+    this.syncAndBroadcastConfig(false).catch(() => null);
 
     this.configCheckInterval = setInterval(() => {
-      this.syncAndBroadcastConfig(false)
-        .catch(() => null);
+      this.syncAndBroadcastConfig(false).catch(() => null);
     }, this.configCheckIntervalMs);
   }
 
@@ -91,9 +93,11 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
 
   public handleConnection(client: WebSocket) {
     const unauthorized = () => {
-      client.send(JSON.stringify({
-        event: 'UNAUTHORIZED',
-      }));
+      client.send(
+        JSON.stringify({
+          event: 'UNAUTHORIZED',
+        }),
+      );
       client.close();
     };
 
@@ -129,11 +133,16 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
 
   @SubscribeMessage('bootstrap')
   @Span()
-  async handleMessage(client: any, payload: { id: string }): Promise<WebSocketResponseMessage<{
-    version: number;
-    checksum: string;
-    snapshot: WorkerConfigSnapshot;
-  }>> {
+  async handleMessage(
+    _client: any,
+    payload: { id: string },
+  ): Promise<
+    WebSocketResponseMessage<{
+      version: number;
+      checksum: string;
+      snapshot: WorkerConfigSnapshot;
+    }>
+  > {
     try {
       const snapshot = await this.bootstrapService.buildSnapshot();
       const checksum = this.bootstrapService.getSnapshotChecksum(snapshot);
@@ -157,7 +166,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnModuleInit, OnMo
   }
 
   @SubscribeMessage('heartbeat')
-  handleHeartbeat(client: any, payload: { id: string }) {
+  handleHeartbeat(_client: any, payload: { id: string }) {
     return {
       replyTo: payload.id,
       payload: {

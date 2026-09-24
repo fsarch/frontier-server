@@ -1,8 +1,8 @@
+import { AuthGuard } from '@fsarch/server/auth';
+import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UpstreamGroupController } from './upstream-group.controller';
 import { UpstreamGroupService } from './upstream-group.service';
-import { AuthGuard } from '@fsarch/server/auth';
-import { Reflector } from '@nestjs/core';
 
 describe.skip('UpstreamGroupController', () => {
   let controller: UpstreamGroupController;

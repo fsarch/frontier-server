@@ -1,6 +1,6 @@
-import { PostHookPayload } from "../models/post-hook-payload.js";
-import { applyCachePolicyToResponse } from "../../utils/http/cache-control.utils.js";
-import type { CompiledCachePolicy } from "../compiled-config.js";
+import { applyCachePolicyToResponse } from '../../utils/http/cache-control.utils.js';
+import type { CompiledCachePolicy } from '../compiled-config.js';
+import { PostHookPayload } from '../models/post-hook-payload.js';
 
 /**
  * Erstellt eine Response mit Cache-Headern aus einem PostHookPayload.

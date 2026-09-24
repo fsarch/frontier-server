@@ -1,13 +1,21 @@
 import WebSocket from 'ws';
 
 export class WebSocketClient {
-  private readonly promises: Record<string, { resolve: (data: unknown) => void; reject: (error: Error) => void; timeout: NodeJS.Timeout }> = {};
+  private readonly promises: Record<
+    string,
+    {
+      resolve: (data: unknown) => void;
+      reject: (error: Error) => void;
+      timeout: NodeJS.Timeout;
+    }
+  > = {};
   private webSocket: WebSocket;
 
   public readonly ready: Promise<void>;
 
   constructor(
-    private readonly url = process.env.FRONTIER_CONTROL_PLANE_URL ?? 'ws://localhost:3000/api/workers/websocket',
+    private readonly url = process.env.FRONTIER_CONTROL_PLANE_URL ??
+      'ws://localhost:3000/api/workers/websocket',
     private readonly token = process.env.FRONTIER_WORKER_AUTH_TOKEN ?? 'Test',
   ) {
     this.ready = this.init();
@@ -18,7 +26,9 @@ export class WebSocketClient {
       this.webSocket = new WebSocket(this.url);
 
       this.webSocket.once('open', () => {
-        this.webSocket.send(JSON.stringify({ event: 'auth', data: this.token }));
+        this.webSocket.send(
+          JSON.stringify({ event: 'auth', data: this.token }),
+        );
         resolve();
       });
 
@@ -53,13 +63,15 @@ export class WebSocketClient {
 
       this.promises[id] = { resolve, reject, timeout };
 
-      this.webSocket.send(JSON.stringify({
-        event: name,
-        data: {
-          id,
-          payload,
-        },
-      }));
+      this.webSocket.send(
+        JSON.stringify({
+          event: name,
+          data: {
+            id,
+            payload,
+          },
+        }),
+      );
     });
   }
 }

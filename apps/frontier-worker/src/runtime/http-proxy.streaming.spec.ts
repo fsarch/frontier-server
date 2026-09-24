@@ -1,9 +1,13 @@
-import { createServer as createHttpServer, request as httpRequest, type IncomingHttpHeaders } from 'node:http';
-import { createServer as createNetServer, type AddressInfo } from 'node:net';
 import { randomBytes } from 'node:crypto';
-import { HttpProxyServer } from './http-proxy.server.js';
-import { FunctionClient } from './function-client.js';
+import {
+  createServer as createHttpServer,
+  request as httpRequest,
+  type IncomingHttpHeaders,
+} from 'node:http';
+import { type AddressInfo, createServer as createNetServer } from 'node:net';
 import type { WorkerConfigSnapshot } from '../types/worker-config.types.js';
+import { FunctionClient } from './function-client.js';
+import { HttpProxyServer } from './http-proxy.server.js';
 
 type UpstreamRequest = {
   method: string;
@@ -49,13 +53,19 @@ async function startUpstream(): Promise<{
     const chunks: Buffer[] = [];
     req.on('data', (chunk) => chunks.push(chunk));
     req.on('end', () => {
-      requests.push({ method: req.method ?? 'GET', headers: req.headers, body: Buffer.concat(chunks) });
+      requests.push({
+        method: req.method ?? 'GET',
+        headers: req.headers,
+        body: Buffer.concat(chunks),
+      });
       res.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
     });
   });
 
   const port = await new Promise<number>((resolve) => {
-    server.listen(0, '127.0.0.1', () => resolve((server.address() as AddressInfo).port));
+    server.listen(0, '127.0.0.1', () =>
+      resolve((server.address() as AddressInfo).port),
+    );
   });
 
   return {
@@ -67,7 +77,11 @@ async function startUpstream(): Promise<{
 
 function sendRequest(
   port: number,
-  options: { path: string; headers?: Record<string, string>; bodyChunks: Buffer[] },
+  options: {
+    path: string;
+    headers?: Record<string, string>;
+    bodyChunks: Buffer[];
+  },
 ): Promise<{ statusCode: number; body: Buffer }> {
   return new Promise((resolve, reject) => {
     const req = httpRequest(
@@ -84,7 +98,12 @@ function sendRequest(
       (res) => {
         const chunks: Buffer[] = [];
         res.on('data', (chunk) => chunks.push(chunk));
-        res.on('end', () => resolve({ statusCode: res.statusCode ?? 0, body: Buffer.concat(chunks) }));
+        res.on('end', () =>
+          resolve({
+            statusCode: res.statusCode ?? 0,
+            body: Buffer.concat(chunks),
+          }),
+        );
       },
     );
     req.on('error', reject);
@@ -139,7 +158,11 @@ function buildSnapshot(upstreamPort: number): WorkerConfigSnapshot {
     domainGroupDomainsByDomain: {
       ids: ['worker.test'],
       entities: {
-        'worker.test': { id: 'dgd-1', domainGroupId: 'dg-1', domainName: 'worker.test' },
+        'worker.test': {
+          id: 'dgd-1',
+          domainGroupId: 'dg-1',
+          domainName: 'worker.test',
+        },
       },
     },
     cachePolicies: { ids: [], entities: {} },
@@ -159,7 +182,14 @@ function buildSnapshot(upstreamPort: number): WorkerConfigSnapshot {
           domainGroupId: 'dg-1',
           name: 'upstreams',
           upstreams: [
-            { id: 'up-1', upstreamGroupId: 'ug-1', name: 'svc', host: '127.0.0.1', port: upstreamPort, path: '/' },
+            {
+              id: 'up-1',
+              upstreamGroupId: 'ug-1',
+              name: 'svc',
+              host: '127.0.0.1',
+              port: upstreamPort,
+              path: '/',
+            },
           ],
         },
       },
@@ -177,7 +207,9 @@ describe('HttpProxyServer request body handling', () => {
     upstream = await startUpstream();
     proxyPort = await getFreePort();
 
-    functionClient = new FunctionClient({ function_worker: FUNCTION_WORKER_CONFIG });
+    functionClient = new FunctionClient({
+      function_worker: FUNCTION_WORKER_CONFIG,
+    });
 
     proxy = new HttpProxyServer(proxyPort, {
       functionClient,
@@ -219,14 +251,16 @@ describe('HttpProxyServer request body handling', () => {
     const payload = randomBytes(256 * 1024);
     let capturedBody: unknown;
 
-    const executeHookSpy = vi.spyOn(functionClient, 'executeHook').mockImplementation(async (_hook, hookPayload: any) => {
-      capturedBody = hookPayload.payload.upstreamRequest.body;
-      return {
-        statusCode: 201,
-        headers: {},
-        body: hookPayload.payload.upstreamRequest,
-      };
-    });
+    const executeHookSpy = vi
+      .spyOn(functionClient, 'executeHook')
+      .mockImplementation(async (_hook, hookPayload: any) => {
+        capturedBody = hookPayload.payload.upstreamRequest.body;
+        return {
+          statusCode: 201,
+          headers: {},
+          body: hookPayload.payload.upstreamRequest,
+        };
+      });
 
     const response = await sendRequest(proxyPort, {
       path: '/hooked',
@@ -241,12 +275,19 @@ describe('HttpProxyServer request body handling', () => {
     // The payload is base64-encoded (see BinaryUint8ArrayBodyType) so it survives being handed to
     // executeHook, which JSON-serializes it for the (mocked) remote function server call.
     expect((capturedBody as any)?.type).toBe('binary.uint8array');
-    expect(Buffer.compare(Buffer.from((capturedBody as any).payload, 'base64'), payload)).toBe(0);
+    expect(
+      Buffer.compare(
+        Buffer.from((capturedBody as any).payload, 'base64'),
+        payload,
+      ),
+    ).toBe(0);
 
     // Because a pre-hook ran, the buffered bytes are sent upstream as a fixed-length body (content-length, not chunked).
     expect(upstream.requests).toHaveLength(1);
     const upstreamRequest = upstream.requests[0];
-    expect(upstreamRequest.headers['content-length']).toBe(String(payload.byteLength));
+    expect(upstreamRequest.headers['content-length']).toBe(
+      String(payload.byteLength),
+    );
     expect(upstreamRequest.headers['transfer-encoding']).toBeUndefined();
     expect(Buffer.compare(upstreamRequest.body, payload)).toBe(0);
   });
@@ -255,14 +296,16 @@ describe('HttpProxyServer request body handling', () => {
     const payloadObject = { hello: 'world', nested: { count: 3 } };
     let capturedBody: unknown;
 
-    vi.spyOn(functionClient, 'executeHook').mockImplementation(async (_hook, hookPayload: any) => {
-      capturedBody = hookPayload.payload.upstreamRequest.body;
-      return {
-        statusCode: 201,
-        headers: {},
-        body: hookPayload.payload.upstreamRequest,
-      };
-    });
+    vi.spyOn(functionClient, 'executeHook').mockImplementation(
+      async (_hook, hookPayload: any) => {
+        capturedBody = hookPayload.payload.upstreamRequest.body;
+        return {
+          statusCode: 201,
+          headers: {},
+          body: hookPayload.payload.upstreamRequest,
+        };
+      },
+    );
 
     const response = await sendRequest(proxyPort, {
       path: '/hooked',
@@ -278,14 +321,16 @@ describe('HttpProxyServer request body handling', () => {
   it('decodes a text/plain body for the pre-hook as a string (type: text)', async () => {
     let capturedBody: unknown;
 
-    vi.spyOn(functionClient, 'executeHook').mockImplementation(async (_hook, hookPayload: any) => {
-      capturedBody = hookPayload.payload.upstreamRequest.body;
-      return {
-        statusCode: 201,
-        headers: {},
-        body: hookPayload.payload.upstreamRequest,
-      };
-    });
+    vi.spyOn(functionClient, 'executeHook').mockImplementation(
+      async (_hook, hookPayload: any) => {
+        capturedBody = hookPayload.payload.upstreamRequest.body;
+        return {
+          statusCode: 201,
+          headers: {},
+          body: hookPayload.payload.upstreamRequest,
+        };
+      },
+    );
 
     const response = await sendRequest(proxyPort, {
       path: '/hooked',
@@ -301,14 +346,16 @@ describe('HttpProxyServer request body handling', () => {
   it('falls back to raw bytes for the pre-hook when Content-Type claims JSON but the body is not valid JSON', async () => {
     let capturedBody: unknown;
 
-    vi.spyOn(functionClient, 'executeHook').mockImplementation(async (_hook, hookPayload: any) => {
-      capturedBody = hookPayload.payload.upstreamRequest.body;
-      return {
-        statusCode: 201,
-        headers: {},
-        body: hookPayload.payload.upstreamRequest,
-      };
-    });
+    vi.spyOn(functionClient, 'executeHook').mockImplementation(
+      async (_hook, hookPayload: any) => {
+        capturedBody = hookPayload.payload.upstreamRequest.body;
+        return {
+          statusCode: 201,
+          headers: {},
+          body: hookPayload.payload.upstreamRequest,
+        };
+      },
+    );
 
     const response = await sendRequest(proxyPort, {
       path: '/hooked',
@@ -318,27 +365,31 @@ describe('HttpProxyServer request body handling', () => {
 
     expect(response.statusCode).toBe(200);
     expect((capturedBody as any)?.type).toBe('binary.uint8array');
-    expect(Buffer.from((capturedBody as any).payload, 'base64').toString('utf-8')).toBe('not actually json');
+    expect(
+      Buffer.from((capturedBody as any).payload, 'base64').toString('utf-8'),
+    ).toBe('not actually json');
   });
 
   it('does not buffer GET requests and forwards them without a body', async () => {
-    const response = await new Promise<{ statusCode: number }>((resolve, reject) => {
-      const req = httpRequest(
-        {
-          host: '127.0.0.1',
-          port: proxyPort,
-          method: 'GET',
-          path: '/plain',
-          headers: { host: 'worker.test' },
-        },
-        (res) => {
-          res.resume();
-          res.on('end', () => resolve({ statusCode: res.statusCode ?? 0 }));
-        },
-      );
-      req.on('error', reject);
-      req.end();
-    });
+    const response = await new Promise<{ statusCode: number }>(
+      (resolve, reject) => {
+        const req = httpRequest(
+          {
+            host: '127.0.0.1',
+            port: proxyPort,
+            method: 'GET',
+            path: '/plain',
+            headers: { host: 'worker.test' },
+          },
+          (res) => {
+            res.resume();
+            res.on('end', () => resolve({ statusCode: res.statusCode ?? 0 }));
+          },
+        );
+        req.on('error', reject);
+        req.end();
+      },
+    );
 
     expect(response.statusCode).toBe(200);
     expect(upstream.requests).toHaveLength(1);

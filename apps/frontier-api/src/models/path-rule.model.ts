@@ -1,7 +1,6 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { PathRule } from "../database/entities/path-rule.entity.js";
-import { Hook } from "../database/entities/hook.entity.js";
-import { Optional } from "@nestjs/common";
+import { Optional } from '@nestjs/common';
+import { ApiProperty } from '@nestjs/swagger';
+import { PathRule } from '../database/entities/path-rule.entity.js';
 
 export class PathRuleDto {
   static FromDbo(dbo: PathRule) {

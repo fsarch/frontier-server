@@ -1,8 +1,8 @@
+import { AuthGuard } from '@fsarch/server/auth';
+import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CachePolicyController } from './cache-policy.controller';
 import { CachePolicyService } from './cache-policy.service';
-import { AuthGuard } from '@fsarch/server/auth';
-import { Reflector } from '@nestjs/core';
 
 describe.skip('CachePolicyController', () => {
   let controller: CachePolicyController;

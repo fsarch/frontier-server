@@ -2,8 +2,11 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CorsPolicy } from '../../../database/entities/cors-policy.entity.js';
-import { CorsPolicyCreateDto, CorsPolicyUpdateDto } from '../../../models/cors-policy.model.js';
 import { PathRule } from '../../../database/entities/path-rule.entity.js';
+import {
+  CorsPolicyCreateDto,
+  CorsPolicyUpdateDto,
+} from '../../../models/cors-policy.model.js';
 
 @Injectable()
 export class CorsPolicyService {
@@ -12,8 +15,7 @@ export class CorsPolicyService {
     private readonly corsPolicyRepository: Repository<CorsPolicy>,
     @InjectRepository(PathRule)
     private readonly pathRuleRepository: Repository<PathRule>,
-  ) {
-  }
+  ) {}
 
   public async Create(domainGroupId: string, dto: CorsPolicyCreateDto) {
     const createdCorsPolicy = this.corsPolicyRepository.create({
@@ -25,7 +27,8 @@ export class CorsPolicyService {
       allowedOrigins: normalizeAllowedOrigins(dto.allowedOrigins),
     });
 
-    const savedCorsPolicy = await this.corsPolicyRepository.save(createdCorsPolicy);
+    const savedCorsPolicy =
+      await this.corsPolicyRepository.save(createdCorsPolicy);
 
     return {
       id: savedCorsPolicy.id,
@@ -54,7 +57,11 @@ export class CorsPolicyService {
     return corsPolicy;
   }
 
-  public async Update(id: string, domainGroupId: string, dto: CorsPolicyUpdateDto): Promise<CorsPolicy> {
+  public async Update(
+    id: string,
+    domainGroupId: string,
+    dto: CorsPolicyUpdateDto,
+  ): Promise<CorsPolicy> {
     const corsPolicy = await this.GetById(id, domainGroupId);
 
     if (dto.name !== undefined) {
@@ -84,7 +91,9 @@ export class CorsPolicyService {
       .update(PathRule)
       .set({ corsPolicyId: null })
       .where('domain_group_id = :domainGroupId', { domainGroupId })
-      .andWhere('cors_policy_id = :corsPolicyId', { corsPolicyId: corsPolicy.id })
+      .andWhere('cors_policy_id = :corsPolicyId', {
+        corsPolicyId: corsPolicy.id,
+      })
       .execute();
 
     await this.corsPolicyRepository.softDelete(corsPolicy.id);
@@ -96,4 +105,3 @@ function normalizeAllowedOrigins(origins: string[] | undefined): string[] {
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
 }
-

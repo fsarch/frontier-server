@@ -6,7 +6,10 @@ export class HookPayload<T = unknown> {
   ) {}
 
   withMetadata(newMetadata: Record<string, unknown>): HookPayload<T> {
-    return new HookPayload(this.type, this.payload, { ...this.metadata, ...newMetadata });
+    return new HookPayload(this.type, this.payload, {
+      ...this.metadata,
+      ...newMetadata,
+    });
   }
 
   toJSON(): { type: string; payload: T; metadata: Record<string, unknown> } {

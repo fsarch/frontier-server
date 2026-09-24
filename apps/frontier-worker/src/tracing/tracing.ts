@@ -1,13 +1,25 @@
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { ConsoleSpanExporter, TraceIdRatioBasedSampler, type SpanExporter } from '@opentelemetry/sdk-trace-base';
-import { OTLPTraceExporter as OTLPTraceExporterHttp } from '@opentelemetry/exporter-trace-otlp-http';
-import { OTLPTraceExporter as OTLPTraceExporterGrpc } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { Metadata } from '@grpc/grpc-js';
+import {
+  type Span,
+  SpanStatusCode,
+  type Tracer,
+  trace,
+} from '@opentelemetry/api';
+import { OTLPTraceExporter as OTLPTraceExporterGrpc } from '@opentelemetry/exporter-trace-otlp-grpc';
+import { OTLPTraceExporter as OTLPTraceExporterHttp } from '@opentelemetry/exporter-trace-otlp-http';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { UndiciInstrumentation } from '@opentelemetry/instrumentation-undici';
 import { resourceFromAttributes } from '@opentelemetry/resources';
-import { trace, SpanStatusCode, type Span, type Tracer } from '@opentelemetry/api';
-import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import {
+  ConsoleSpanExporter,
+  type SpanExporter,
+  TraceIdRatioBasedSampler,
+} from '@opentelemetry/sdk-trace-base';
+import {
+  ATTR_SERVICE_NAME,
+  ATTR_SERVICE_VERSION,
+} from '@opentelemetry/semantic-conventions';
 
 const DEFAULT_TRACER_NAME = 'frontier-worker';
 
@@ -30,23 +42,39 @@ let sdk: NodeSDK | undefined;
 // Reads the FRONTIER_WORKER_TRACING_* environment variables - frontier-worker is entirely
 // env-var configured (see README.md), so tracing follows the same convention rather than
 // pulling in a YAML config file just for this.
-export function loadTracingConfigFromEnv(env: NodeJS.ProcessEnv = process.env): TracingConfig {
+export function loadTracingConfigFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): TracingConfig {
   const enabled = isTruthy(env.FRONTIER_WORKER_TRACING_ENABLED);
-  const type = (env.FRONTIER_WORKER_TRACING_EXPORTER ?? 'console') as ExporterType;
+  const type = (env.FRONTIER_WORKER_TRACING_EXPORTER ??
+    'console') as ExporterType;
 
-  if (enabled && type !== 'console' && type !== 'otlp-http' && type !== 'otlp-grpc') {
+  if (
+    enabled &&
+    type !== 'console' &&
+    type !== 'otlp-http' &&
+    type !== 'otlp-grpc'
+  ) {
     throw new Error(`invalid FRONTIER_WORKER_TRACING_EXPORTER: ${type}`);
   }
 
-  if (enabled && (type === 'otlp-http' || type === 'otlp-grpc') && !env.FRONTIER_WORKER_TRACING_EXPORTER_URL) {
-    throw new Error(`FRONTIER_WORKER_TRACING_EXPORTER_URL is required for exporter type ${type}`);
+  if (
+    enabled &&
+    (type === 'otlp-http' || type === 'otlp-grpc') &&
+    !env.FRONTIER_WORKER_TRACING_EXPORTER_URL
+  ) {
+    throw new Error(
+      `FRONTIER_WORKER_TRACING_EXPORTER_URL is required for exporter type ${type}`,
+    );
   }
 
   return {
     enabled,
     serviceName: env.FRONTIER_WORKER_TRACING_SERVICE_NAME ?? 'frontier-worker',
     serviceVersion: env.FRONTIER_WORKER_TRACING_SERVICE_VERSION,
-    sampleRatio: env.FRONTIER_WORKER_TRACING_SAMPLE_RATIO ? Number.parseFloat(env.FRONTIER_WORKER_TRACING_SAMPLE_RATIO) : 1,
+    sampleRatio: env.FRONTIER_WORKER_TRACING_SAMPLE_RATIO
+      ? Number.parseFloat(env.FRONTIER_WORKER_TRACING_SAMPLE_RATIO)
+      : 1,
     exporter: {
       type,
       url: env.FRONTIER_WORKER_TRACING_EXPORTER_URL,
@@ -59,7 +87,9 @@ function isTruthy(value: string | undefined): boolean {
   return value === '1' || value?.toLowerCase() === 'true';
 }
 
-function parseHeaders(value: string | undefined): Record<string, string> | undefined {
+function parseHeaders(
+  value: string | undefined,
+): Record<string, string> | undefined {
   if (!value) {
     return undefined;
   }
@@ -67,11 +97,15 @@ function parseHeaders(value: string | undefined): Record<string, string> | undef
   try {
     return JSON.parse(value);
   } catch {
-    throw new Error('FRONTIER_WORKER_TRACING_EXPORTER_HEADERS must be a valid JSON object string');
+    throw new Error(
+      'FRONTIER_WORKER_TRACING_EXPORTER_HEADERS must be a valid JSON object string',
+    );
   }
 }
 
-function createExporter(exporterConfig: TracingConfig['exporter']): SpanExporter {
+function createExporter(
+  exporterConfig: TracingConfig['exporter'],
+): SpanExporter {
   switch (exporterConfig.type) {
     case 'console':
       return new ConsoleSpanExporter();
@@ -91,13 +125,17 @@ function createExporter(exporterConfig: TracingConfig['exporter']): SpanExporter
       });
     }
     default:
-      throw new Error(`Tracing exporter type unknown: ${(exporterConfig as { type: string }).type}`);
+      throw new Error(
+        `Tracing exporter type unknown: ${(exporterConfig as { type: string }).type}`,
+      );
   }
 }
 
 // Must run before the modules it instruments (the raw `http` server and `undici`/global
 // `fetch`) are imported - see tracing/register.ts, which is preloaded via `node --import`.
-export function initializeTracing(config: TracingConfig = loadTracingConfigFromEnv()): boolean {
+export function initializeTracing(
+  config: TracingConfig = loadTracingConfigFromEnv(),
+): boolean {
   if (sdk) {
     return true;
   }
@@ -109,7 +147,9 @@ export function initializeTracing(config: TracingConfig = loadTracingConfigFromE
   sdk = new NodeSDK({
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: config.serviceName,
-      ...(config.serviceVersion ? { [ATTR_SERVICE_VERSION]: config.serviceVersion } : {}),
+      ...(config.serviceVersion
+        ? { [ATTR_SERVICE_VERSION]: config.serviceVersion }
+        : {}),
     }),
     traceExporter: createExporter(config.exporter),
     sampler: new TraceIdRatioBasedSampler(config.sampleRatio),
@@ -124,7 +164,9 @@ export function initializeTracing(config: TracingConfig = loadTracingConfigFromE
   });
 
   sdk.start();
-  console.log(`[worker] tracing initialized service=${config.serviceName} exporter=${config.exporter.type}`);
+  console.log(
+    `[worker] tracing initialized service=${config.serviceName} exporter=${config.exporter.type}`,
+  );
   return true;
 }
 
@@ -144,7 +186,9 @@ export function getTracer(name: string = DEFAULT_TRACER_NAME): Tracer {
 
 function finishSpan(span: Span, error?: unknown): void {
   if (error !== undefined) {
-    span.recordException(error instanceof Error ? error : new Error(String(error)));
+    span.recordException(
+      error instanceof Error ? error : new Error(String(error)),
+    );
     span.setStatus({
       code: SpanStatusCode.ERROR,
       message: error instanceof Error ? error.message : String(error),
@@ -163,7 +207,10 @@ function finishSpan(span: Span, error?: unknown): void {
 export function withSpan<T>(
   name: string,
   fn: (span: Span) => T,
-  options?: { tracerName?: string; attributes?: Record<string, string | number | boolean> },
+  options?: {
+    tracerName?: string;
+    attributes?: Record<string, string | number | boolean>;
+  },
 ): T {
   const tracer = getTracer(options?.tracerName);
   return tracer.startActiveSpan(name, (span) => {

@@ -81,9 +81,9 @@ The worker applies each new snapshot atomically and immediately serves new route
 From repository root:
 
 ```bash
-npm install
-npm --workspace apps/frontier-worker run start:dev
-npm --workspace apps/frontier-worker run start:local
+pnpm install
+pnpm --filter ./apps/frontier-worker run start:dev
+pnpm --filter ./apps/frontier-worker run start:local
 ```
 
 `start:local` sets local defaults for:
@@ -112,9 +112,9 @@ docker pull fsarch/frontier-server:latest-worker
 ## Useful Scripts
 
 ```bash
-npm --workspace apps/frontier-worker run build
-npm --workspace apps/frontier-worker run lint
-npm --workspace apps/frontier-worker run test
+pnpm --filter ./apps/frontier-worker run build
+pnpm --filter ./apps/frontier-worker run lint
+pnpm --filter ./apps/frontier-worker run test
 ```
 
 ## Integration Note

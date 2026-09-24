@@ -1,10 +1,24 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@fsarch/server/auth';
 import { Roles } from '@fsarch/server/uac';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Role } from '../../../constants/role.enum.js';
+import {
+  LogPolicyCreateDto,
+  LogPolicyDto,
+  LogPolicyUpdateDto,
+} from '../../../models/log-policy.model.js';
 import { LogPolicyService } from './log-policy.service.js';
-import { LogPolicyCreateDto, LogPolicyDto, LogPolicyUpdateDto } from '../../../models/log-policy.model.js';
-import { Role } from "../../../constants/role.enum.js";
 
 @ApiTags('log-policies')
 @Controller({
@@ -13,10 +27,7 @@ import { Role } from "../../../constants/role.enum.js";
 })
 @ApiBearerAuth()
 export class LogPolicyController {
-  constructor(
-    private readonly logPolicyService: LogPolicyService,
-  ) {
-  }
+  constructor(private readonly logPolicyService: LogPolicyService) {}
 
   @Post()
   @UseGuards(AuthGuard)
@@ -31,10 +42,9 @@ export class LogPolicyController {
   @Get()
   @UseGuards(AuthGuard)
   @Roles(Role.manage)
-  public async List(
-    @Param('domainGroupId') domainGroupId: string,
-  ) {
-    const policies = await this.logPolicyService.ListByDomainGroupId(domainGroupId);
+  public async List(@Param('domainGroupId') domainGroupId: string) {
+    const policies =
+      await this.logPolicyService.ListByDomainGroupId(domainGroupId);
 
     return policies.map(LogPolicyDto.FromDbo);
   }
@@ -59,7 +69,11 @@ export class LogPolicyController {
     @Param('id') id: string,
     @Body() logPolicyUpdateDto: LogPolicyUpdateDto,
   ) {
-    const updated = await this.logPolicyService.Update(id, domainGroupId, logPolicyUpdateDto);
+    const updated = await this.logPolicyService.Update(
+      id,
+      domainGroupId,
+      logPolicyUpdateDto,
+    );
 
     return LogPolicyDto.FromDbo(updated);
   }
@@ -75,4 +89,3 @@ export class LogPolicyController {
     await this.logPolicyService.Delete(id, domainGroupId);
   }
 }
-

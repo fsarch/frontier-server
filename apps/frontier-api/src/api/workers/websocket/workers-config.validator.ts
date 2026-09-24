@@ -6,4 +6,3 @@ export const WORKERS_CONFIG_VALIDATOR = Joi.object({
     config_check_interval_ms: Joi.number().integer().min(100).required(),
   }).required(),
 });
-

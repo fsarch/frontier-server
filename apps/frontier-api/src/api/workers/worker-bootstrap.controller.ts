@@ -1,7 +1,10 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { AuthGuard } from '@fsarch/server/auth';
-import { WorkerBootstrapService, WorkerConfigSnapshot } from './worker-bootstrap.service.js';
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  WorkerBootstrapService,
+  WorkerConfigSnapshot,
+} from './worker-bootstrap.service.js';
 
 @ApiTags('workers')
 @Controller({
@@ -13,9 +16,7 @@ export class WorkerBootstrapController {
   private configVersion = 0;
   private configChecksum = '';
 
-  constructor(
-    private readonly bootstrapService: WorkerBootstrapService,
-  ) {}
+  constructor(private readonly bootstrapService: WorkerBootstrapService) {}
 
   @Get('bootstrap')
   @UseGuards(AuthGuard)
@@ -26,7 +27,7 @@ export class WorkerBootstrapController {
   }> {
     const response = await this.bootstrapService.getBootstrapResponse(
       this.configVersion,
-      this.configChecksum
+      this.configChecksum,
     );
 
     // Update internal state for next request

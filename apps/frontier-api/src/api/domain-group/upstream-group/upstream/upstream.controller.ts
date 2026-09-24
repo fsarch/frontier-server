@@ -1,10 +1,23 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { AuthGuard } from '@fsarch/server/auth';
 import { Roles } from '@fsarch/server/uac';
-import { UpstreamService } from "./upstream.service.js";
-import { UpstreamCreateDto, UpstreamDto, UpstreamUpdateDto } from "../../../../models/upstream.model.js";
-import { Role } from "../../../../constants/role.enum.js";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Role } from '../../../../constants/role.enum.js';
+import {
+  UpstreamCreateDto,
+  UpstreamDto,
+  UpstreamUpdateDto,
+} from '../../../../models/upstream.model.js';
+import { UpstreamService } from './upstream.service.js';
 
 @ApiTags('upstream')
 @Controller({
@@ -13,10 +26,7 @@ import { Role } from "../../../../constants/role.enum.js";
 })
 @ApiBearerAuth()
 export class UpstreamController {
-  constructor(
-    private readonly upstreamService: UpstreamService,
-  ) {
-  }
+  constructor(private readonly upstreamService: UpstreamService) {}
 
   @Post()
   @UseGuards(AuthGuard)
@@ -34,12 +44,9 @@ export class UpstreamController {
   @Get()
   @UseGuards(AuthGuard)
   @Roles(Role.manage)
-  public async List(
-    @Param('upstreamGroupId') upstreamGroupId: string,
-  ) {
-    const pathRules = await this.upstreamService.ListByUpstreamGroupId(
-      upstreamGroupId,
-    );
+  public async List(@Param('upstreamGroupId') upstreamGroupId: string) {
+    const pathRules =
+      await this.upstreamService.ListByUpstreamGroupId(upstreamGroupId);
 
     return pathRules.map(UpstreamDto.FromDbo);
   }
@@ -47,9 +54,7 @@ export class UpstreamController {
   @Get('/:id')
   @UseGuards(AuthGuard)
   @Roles(Role.manage)
-  public async Get(
-    @Param('id') id: string,
-  ) {
+  public async Get(@Param('id') id: string) {
     const upstream = await this.upstreamService.GetById(id);
     if (!upstream) {
       return null;
@@ -74,9 +79,7 @@ export class UpstreamController {
   @Delete('/:id')
   @UseGuards(AuthGuard)
   @Roles(Role.manage)
-  public async Delete(
-    @Param('id') id: string,
-  ) {
+  public async Delete(@Param('id') id: string) {
     const deleted = await this.upstreamService.Delete(id);
     return { success: deleted };
   }

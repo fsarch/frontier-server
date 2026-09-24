@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Upstream } from "../../../../database/entities/upstream.entity.js";
-import { UpstreamSslOptions } from "../../../../database/entities/upstream-ssl-options.entity.js";
-import { UpstreamCreateDto, UpstreamUpdateDto, UpstreamWithSslOptions } from "../../../../models/upstream.model.js";
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Upstream } from '../../../../database/entities/upstream.entity.js';
+import { UpstreamSslOptions } from '../../../../database/entities/upstream-ssl-options.entity.js';
+import {
+  UpstreamCreateDto,
+  UpstreamUpdateDto,
+  UpstreamWithSslOptions,
+} from '../../../../models/upstream.model.js';
 
 @Injectable()
 export class UpstreamService {
@@ -12,13 +16,9 @@ export class UpstreamService {
     private readonly upstreamRepository: Repository<Upstream>,
     @InjectRepository(UpstreamSslOptions)
     private readonly upstreamSslOptionsRepository: Repository<UpstreamSslOptions>,
-  ) {
-  }
+  ) {}
 
-  public async Create(
-    upstreamGroupId: string,
-    upstreamDto: UpstreamCreateDto,
-  ) {
+  public async Create(upstreamGroupId: string, upstreamDto: UpstreamCreateDto) {
     const createdUpstream = this.upstreamRepository.create({
       id: crypto.randomUUID(),
       upstreamGroupId,
@@ -30,19 +30,19 @@ export class UpstreamService {
     });
 
     const savedUpstream = await this.upstreamRepository.save(createdUpstream);
-    await this.upstreamSslOptionsRepository.save(this.upstreamSslOptionsRepository.create({
-      id: savedUpstream.id,
-      sslVerify: upstreamDto.sslOptions?.sslVerify ?? true,
-    }));
+    await this.upstreamSslOptionsRepository.save(
+      this.upstreamSslOptionsRepository.create({
+        id: savedUpstream.id,
+        sslVerify: upstreamDto.sslOptions?.sslVerify ?? true,
+      }),
+    );
 
     return {
       id: savedUpstream.id,
     };
   }
 
-  public async ListByUpstreamGroupId(
-    upstreamGroupId: string,
-  ) {
+  public async ListByUpstreamGroupId(upstreamGroupId: string) {
     const upstreams = await this.upstreamRepository.find({
       where: { upstreamGroupId },
     });
@@ -55,9 +55,7 @@ export class UpstreamService {
     return this.attachSslOptions(upstreams);
   }
 
-  public async GetById(
-    id: string,
-  ) {
+  public async GetById(id: string) {
     const upstream = await this.upstreamRepository.findOne({ where: { id } });
     if (!upstream) {
       return null;
@@ -65,11 +63,10 @@ export class UpstreamService {
     return (await this.attachSslOptions([upstream]))[0];
   }
 
-  public async Update(
-    id: string,
-    upstreamDto: UpstreamUpdateDto,
-  ) {
-    const existingUpstream = await this.upstreamRepository.findOne({ where: { id } });
+  public async Update(id: string, upstreamDto: UpstreamUpdateDto) {
+    const existingUpstream = await this.upstreamRepository.findOne({
+      where: { id },
+    });
     if (!existingUpstream) {
       return null;
     }
@@ -89,14 +86,16 @@ export class UpstreamService {
       });
     }
 
-    const updatedUpstream = await this.upstreamRepository.findOne({ where: { id } });
+    const updatedUpstream = await this.upstreamRepository.findOne({
+      where: { id },
+    });
     return (await this.attachSslOptions([updatedUpstream!]))[0];
   }
 
-  public async Delete(
-    id: string,
-  ) {
-    const existingUpstream = await this.upstreamRepository.findOne({ where: { id } });
+  public async Delete(id: string) {
+    const existingUpstream = await this.upstreamRepository.findOne({
+      where: { id },
+    });
     if (!existingUpstream) {
       return false;
     }
@@ -105,7 +104,9 @@ export class UpstreamService {
     return true;
   }
 
-  private async attachSslOptions(upstreams: Upstream[]): Promise<UpstreamWithSslOptions[]> {
+  private async attachSslOptions(
+    upstreams: Upstream[],
+  ): Promise<UpstreamWithSslOptions[]> {
     if (upstreams.length === 0) {
       return upstreams;
     }
@@ -113,7 +114,9 @@ export class UpstreamService {
     const sslOptions = await this.upstreamSslOptionsRepository.find({
       where: upstreams.map((upstream) => ({ id: upstream.id })),
     });
-    const sslOptionsByUpstreamId = new Map(sslOptions.map((option) => [option.id, option]));
+    const sslOptionsByUpstreamId = new Map(
+      sslOptions.map((option) => [option.id, option]),
+    );
 
     return upstreams.map((upstream) => {
       const option = sslOptionsByUpstreamId.get(upstream.id);

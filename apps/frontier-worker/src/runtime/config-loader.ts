@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as yaml from 'js-yaml';
 import { FunctionConfigs } from './function-client.js';
@@ -22,7 +22,9 @@ export type WorkerConfig = {
   };
 };
 
-export async function loadWorkerConfig(configPath?: string): Promise<FunctionConfigs> {
+export async function loadWorkerConfig(
+  configPath?: string,
+): Promise<FunctionConfigs> {
   const path = configPath ?? DEFAULT_CONFIG_PATH;
 
   try {
@@ -30,19 +32,23 @@ export async function loadWorkerConfig(configPath?: string): Promise<FunctionCon
     const config = yaml.load(fileContent) as WorkerConfig;
 
     return {
-      function_worker: config.function_worker ? {
-        type: config.function_worker.type,
-        url: config.function_worker.url,
-        auth: {
-          type: config.function_worker.auth.type,
-          token_endpoint: config.function_worker.auth.token_endpoint,
-          client_id: config.function_worker.auth.client_id,
-          client_secret: config.function_worker.auth.client_secret,
-        },
-      } : undefined,
+      function_worker: config.function_worker
+        ? {
+            type: config.function_worker.type,
+            url: config.function_worker.url,
+            auth: {
+              type: config.function_worker.auth.type,
+              token_endpoint: config.function_worker.auth.token_endpoint,
+              client_id: config.function_worker.auth.client_id,
+              client_secret: config.function_worker.auth.client_secret,
+            },
+          }
+        : undefined,
     };
   } catch (error) {
-    console.warn(`[worker][config] failed to load config from ${path}: ${error}`);
+    console.warn(
+      `[worker][config] failed to load config from ${path}: ${error}`,
+    );
     // Standardwerte zurückgeben
     return {};
   }

@@ -51,8 +51,8 @@ W3C `traceparent` propagation across the control-plane/data-plane boundary.
 From repository root:
 
 ```bash
-npm install
-npm --workspace apps/frontier-api run start:dev
+pnpm install
+pnpm --filter ./apps/frontier-api run start:dev
 ```
 
 By default, the server listens on port `3000` (or `PORT` if set).
@@ -66,8 +66,8 @@ When running, Swagger UI is available at:
 ## Useful Scripts
 
 ```bash
-npm --workspace apps/frontier-api run build
-npm --workspace apps/frontier-api run lint
-npm --workspace apps/frontier-api run test
-npm --workspace apps/frontier-api run test:e2e
+pnpm --filter ./apps/frontier-api run build
+pnpm --filter ./apps/frontier-api run lint
+pnpm --filter ./apps/frontier-api run test
+pnpm --filter ./apps/frontier-api run test:e2e
 ```

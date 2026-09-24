@@ -67,7 +67,10 @@ describe('FunctionClient pre-hook handling', () => {
     });
 
     const result = await client.executePreHooks(
-      { enabled: true, functions: [{ id: 'hook-1', name: 'hook', functionId: 'fn-1' }] },
+      {
+        enabled: true,
+        functions: [{ id: 'hook-1', name: 'hook', functionId: 'fn-1' }],
+      },
       originalRequest,
       originalRequest,
     );
@@ -88,7 +91,10 @@ describe('FunctionClient pre-hook handling', () => {
     });
 
     const result = await client.executePreHooks(
-      { enabled: true, functions: [{ id: 'hook-1', name: 'hook', functionId: 'fn-1' }] },
+      {
+        enabled: true,
+        functions: [{ id: 'hook-1', name: 'hook', functionId: 'fn-1' }],
+      },
       request,
       request,
     );
@@ -108,7 +114,10 @@ describe('FunctionClient pre-hook handling', () => {
     });
 
     const result = await client.executePreHooks(
-      { enabled: true, functions: [{ id: 'hook-1', name: 'hook', functionId: 'fn-1' }] },
+      {
+        enabled: true,
+        functions: [{ id: 'hook-1', name: 'hook', functionId: 'fn-1' }],
+      },
       request,
       request,
     );

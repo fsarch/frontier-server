@@ -1,5 +1,5 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { Upstream } from "../database/entities/upstream.entity.js";
+import { ApiProperty } from '@nestjs/swagger';
+import { Upstream } from '../database/entities/upstream.entity.js';
 
 export type UpstreamWithSslOptions = Upstream & {
   sslOptions?: UpstreamSslOptionsDto;

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { CachePolicyService } from './cache-policy.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CachePolicy } from '../../../database/entities/cache-policy.entity.js';
+import { CachePolicyService } from './cache-policy.service';
 
 describe('CachePolicyService', () => {
   let service: CachePolicyService;
