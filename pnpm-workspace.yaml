@@ -1,5 +1,12 @@
 packages:
   - "apps/*"
+minimumReleaseAgeExclude:
+  # @fsarch/server is only published to GitHub Packages, not the public npm
+  # registry - pnpm's minimumReleaseAge check can't find its manifest there
+  # to verify a publish date, so it fails closed. Exclude it explicitly,
+  # same as the michael-braun/image-server repo does for its own
+  # unresolvable entries.
+  - '@fsarch/server@0.3.3'
 allowBuilds:
   '@scarf/scarf': false
   '@swc/core': true
