@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Requirements
+
+`requirements.md` (repo root, German) documents the **functional** behavior of both apps with stable IDs (`API-…`, `PROT-…`, `WRK-…`). **Every change that alters functional behavior must update `requirements.md` in the same change**: add, edit, or strike the affected requirements, and keep IDs stable (new ones get the next free number, removed ones are struck, not renumbered). Purely technical changes (refactors, deps, CI, logging) don't need an entry.
+
 ## Repository Structure
 
 npm-workspaces monorepo (lerna is present but only used for versioning, not publishing/running) with two independent NestJS-flavored apps under `apps/`:
