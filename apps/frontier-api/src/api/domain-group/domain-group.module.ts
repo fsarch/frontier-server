@@ -8,6 +8,7 @@ import { DomainGroupController } from './domain-group.controller.js';
 import { DomainGroupService } from './domain-group.service.js';
 import { LogPolicyModule } from './log-policy/log-policy.module.js';
 import { PathRuleModule } from './path-rule/path-rule.module.js';
+import { RateLimitPolicyModule } from './rate-limit-policy/rate-limit-policy.module.js';
 import { RequestLogModule } from './request-log/request-log.module.js';
 import { UpstreamGroupModule } from './upstream-group/upstream-group.module.js';
 
@@ -22,6 +23,7 @@ import { UpstreamGroupModule } from './upstream-group/upstream-group.module.js';
     CorsPolicyModule,
     LogPolicyModule,
     PathRuleModule,
+    RateLimitPolicyModule,
     RequestLogModule,
     UpstreamGroupModule,
   ],

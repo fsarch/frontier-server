@@ -15,6 +15,7 @@ export class PathRuleDto {
     dto.order = dbo.order;
     dto.corsPolicyId = dbo.corsPolicyId ?? null;
     dto.logPolicyId = dbo.logPolicyId ?? null;
+    dto.rateLimitPolicyId = dbo.rateLimitPolicyId ?? null;
     dto.preHookId = dbo.preHookId ?? null;
     dto.postHookId = dbo.postHookId ?? null;
 
@@ -47,6 +48,9 @@ export class PathRuleDto {
 
   @ApiProperty({ required: false })
   logPolicyId: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  rateLimitPolicyId: string | null;
 
   @ApiProperty({ required: false, nullable: true })
   preHookId: string | null;
@@ -86,6 +90,10 @@ export class PathRuleUpdateDto {
 
   @ApiProperty({ required: false, nullable: true })
   @Optional()
+  rateLimitPolicyId?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Optional()
   preHookId?: string | null;
 
   @ApiProperty({ required: false, nullable: true })
@@ -117,6 +125,10 @@ export class PathRuleCreateDto {
   @ApiProperty({ required: false })
   @Optional()
   logPolicyId?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Optional()
+  rateLimitPolicyId?: string | null;
 
   @ApiProperty({ required: false, nullable: true })
   @Optional()

@@ -375,6 +375,81 @@ describe('CompiledWorkerConfig', () => {
     expect(route?.pathRuleId).toBe('rule-1');
   });
 
+  it('compiles and resolves rate limit policy per matched rule', () => {
+    const snapshot = createSnapshot();
+    snapshot.domainGroups.entities['dg-1'].pathRules = [
+      {
+        id: 'rule-1',
+        domainGroupId: 'dg-1',
+        name: 'api',
+        path: '/api',
+        order: 1,
+        cachePolicyId: null,
+        upstreamGroupId: 'ug-1',
+        rateLimitPolicyId: 'rl-1',
+      },
+      {
+        id: 'rule-2',
+        domainGroupId: 'dg-1',
+        name: 'root',
+        path: '/',
+        order: 2,
+        cachePolicyId: null,
+        upstreamGroupId: 'ug-2',
+        rateLimitPolicyId: 'rl-disabled',
+      },
+    ];
+    snapshot.rateLimitPolicies = {
+      ids: ['rl-1', 'rl-disabled'],
+      entities: {
+        'rl-1': {
+          id: 'rl-1',
+          domainGroupId: 'dg-1',
+          name: 'api',
+          enabled: true,
+          limit: 100,
+          windowSeconds: 60,
+          keyType: 'ip',
+        },
+        'rl-disabled': {
+          id: 'rl-disabled',
+          domainGroupId: 'dg-1',
+          name: 'off',
+          enabled: false,
+          limit: 5,
+          windowSeconds: 60,
+          keyType: 'ip',
+        },
+      },
+    };
+
+    const config = new CompiledWorkerConfig(snapshot);
+
+    expect(config.resolve('example.com', '/api/users')?.rateLimit).toEqual({
+      enabled: true,
+      rateLimitPolicyId: 'rl-1',
+      limit: 100,
+      windowSeconds: 60,
+      keyType: 'ip',
+    });
+    expect(config.resolve('example.com', '/other')?.rateLimit.enabled).toBe(
+      false,
+    );
+  });
+
+  it('treats a snapshot without rate limit policies as unlimited', () => {
+    const snapshot = createSnapshot();
+    snapshot.domainGroups.entities['dg-1'].pathRules[0].rateLimitPolicyId =
+      'rl-1';
+    delete snapshot.rateLimitPolicies;
+
+    const config = new CompiledWorkerConfig(snapshot);
+
+    expect(config.resolve('example.com', '/api/users')?.rateLimit.enabled).toBe(
+      false,
+    );
+  });
+
   it('defaults upstream protocol to http with ssl verification enabled', () => {
     const config = new CompiledWorkerConfig(createSnapshot());
     const route = config.resolve('example.com', '/api/users');

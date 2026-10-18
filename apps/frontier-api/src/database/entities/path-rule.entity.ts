@@ -71,6 +71,13 @@ export class PathRule {
   logPolicyId?: string | null;
 
   @Column({
+    name: 'rate_limit_policy_id',
+    type: 'uuid',
+    nullable: true,
+  })
+  rateLimitPolicyId?: string | null;
+
+  @Column({
     name: 'pre_hook_id',
     type: 'uuid',
     nullable: true,

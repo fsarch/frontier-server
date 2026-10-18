@@ -69,6 +69,24 @@ Tracing is wired up via `node --import ./dist/tracing/register.js` (see the `sta
 `undici`) need OpenTelemetry's loader hook registered before they are first imported anywhere in
 the process.
 
+## Rate Limiting
+
+Rate limit policies are managed in `frontier-api` and assigned to path rules. The worker counts
+requests per path rule, policy and client IP in fixed windows and answers `429` (with
+`Retry-After` and `RateLimit-*` headers) once the limit is exceeded.
+
+Where the counters live is configured in `config/config.yml` under `rate_limit` (see
+`config/config.template.yml`):
+
+- `store.type: memory` (default) - in-process, counts per worker instance
+- `store.type: redis` - shared across workers (`url`, optional `key_prefix`)
+- `store.type: postgres` - shared across workers, Postgres/CockroachDB (`host`, `port`, `username`,
+  `password`, `database`, optional `ssl`, `table`); the worker creates the table itself
+- `trust_forwarded_for` (default `false`) - use the first `X-Forwarded-For` entry as client IP
+
+If the store is unreachable or slower than 250 ms, requests are let through (fail-open) and the
+error is logged.
+
 ## Control Plane Events (MVP)
 
 - Worker -> API: `auth`, `bootstrap`, `heartbeat`

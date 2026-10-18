@@ -34,6 +34,11 @@ import {
   buildCorsResponse,
 } from './hooks/cors.hook.js';
 import { PostHookPayload } from './models/post-hook-payload.js';
+import {
+  buildRateLimitHeaders,
+  type RateLimitDecision,
+  type RateLimiter,
+} from './rate-limit/rate-limiter.js';
 
 type Metrics = {
   startedAt: number;
@@ -66,6 +71,7 @@ type HttpProxyServerOptions = {
   onRequestLog?: (payload: RequestLogPayload) => Promise<void>;
   functionClient?: FunctionClient;
   functionConfigs?: Record<string, FunctionServerConfig>;
+  rateLimiter?: RateLimiter;
 };
 
 const HOP_BY_HOP_HEADERS = new Set([
@@ -317,6 +323,41 @@ export class HttpProxyServer {
         return;
       }
 
+      // Rate limiting runs after CORS handling (preflights and rejected origins are not counted)
+      // and before any pre-hook or upstream work, so a blocked request costs as little as possible.
+      const rateLimitDecision = await this.checkRateLimit(route, req);
+      const rateLimitHeaders = rateLimitDecision
+        ? buildRateLimitHeaders(rateLimitDecision)
+        : {};
+
+      if (rateLimitDecision && !rateLimitDecision.allowed) {
+        this.debug(
+          `rate limit exceeded path=${requestUrl.pathname} limit=${rateLimitDecision.limit} reset=${rateLimitDecision.resetSeconds}s`,
+        );
+        const responseHeaders: Record<string, string> = {
+          'content-type': 'text/plain',
+          ...rateLimitHeaders,
+        };
+        if (route.cors.enabled && requestOrigin) {
+          Object.assign(
+            responseHeaders,
+            buildCorsHeadersForHttp(route.cors, requestOrigin),
+          );
+        }
+        res.writeHead(429, responseHeaders).end('rate limit exceeded');
+        await this.reportRequestLog(route, {
+          incomingMethod: method,
+          incomingUrl,
+          incomingHeaders: req.headers,
+          upstreamMethod: method,
+          upstreamUrl,
+          upstreamHeaders,
+          responseStatusCode: 429,
+          requestTimeMs: Date.now() - requestStartedAt,
+        });
+        return;
+      }
+
       this.debug(
         `resolved request host=${hostHeader ?? '<missing>'} path=${requestUrl.pathname} routePrefix=${route.pathPrefix} upstream=${upstreamUrl}`,
       );
@@ -401,7 +442,10 @@ export class HttpProxyServer {
         this.debug(
           `short-circuit response from pre-hook, status=${shortCircuitResponse.statusCode}`,
         );
-        const responseHeaders = { ...shortCircuitResponse.headers };
+        const responseHeaders = {
+          ...shortCircuitResponse.headers,
+          ...rateLimitHeaders,
+        };
         if (route.cors.enabled && requestOrigin) {
           Object.assign(
             responseHeaders,
@@ -578,6 +622,8 @@ export class HttpProxyServer {
       response = buildCacheResponse(cachePayload, route.cachePolicy);
       // endregion
 
+      response = withRateLimitHeaders(response, rateLimitDecision);
+
       this.debug(
         `upstream response status=${response.statusCode} upstream=${upstreamUrl}`,
       );
@@ -669,6 +715,37 @@ export class HttpProxyServer {
     } finally {
       this.metrics.inflight -= 1;
     }
+  }
+
+  private async checkRateLimit(
+    route: NonNullable<ReturnType<CompiledWorkerConfig['resolve']>>,
+    req: IncomingMessage,
+  ): Promise<RateLimitDecision | null> {
+    if (!route.rateLimit.enabled || !this.options?.rateLimiter) {
+      return null;
+    }
+
+    return withSpan(
+      'frontier-worker.rateLimit',
+      async (span) => {
+        const decision = await this.options.rateLimiter.check(
+          route.pathRuleId,
+          route.rateLimit,
+          req,
+        );
+        span.setAttribute('frontier.rate_limit_applied', decision !== null);
+        if (decision) {
+          span.setAttribute('frontier.rate_limit_allowed', decision.allowed);
+        }
+        return decision;
+      },
+      {
+        attributes: {
+          'frontier.path_rule_id': route.pathRuleId,
+          'frontier.rate_limit_policy_id': route.rateLimit.rateLimitPolicyId,
+        },
+      },
+    );
   }
 
   private async reportRequestLog(
@@ -1115,6 +1192,22 @@ async function fetchWithOptionalInsecureTls(
   };
 
   return fetch(url, insecureOptions as RequestInit);
+}
+
+function withRateLimitHeaders(
+  response: ResponseType,
+  decision: RateLimitDecision | null,
+): ResponseType {
+  if (!decision) {
+    return response;
+  }
+
+  const headers = { ...response.headers };
+  for (const [name, value] of Object.entries(buildRateLimitHeaders(decision))) {
+    headers[name] = [value];
+  }
+
+  return { ...response, headers };
 }
 
 function getSingleHeaderValue(

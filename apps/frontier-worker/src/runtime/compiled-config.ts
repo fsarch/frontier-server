@@ -3,6 +3,8 @@ import {
   CorsPolicy,
   EntityMap,
   Hook,
+  RateLimitKeyType,
+  RateLimitPolicy,
   WorkerConfigSnapshot,
 } from '../types/worker-config.types.js';
 import { FunctionConfigs } from './function-client.js';
@@ -13,6 +15,14 @@ export type CompiledCachePolicy = {
   minTTL: number;
   maxTTL: number;
   defaultTTL: number;
+};
+
+export type CompiledRateLimitPolicy = {
+  enabled: boolean;
+  rateLimitPolicyId: string | null;
+  limit: number;
+  windowSeconds: number;
+  keyType: RateLimitKeyType;
 };
 
 export type CompiledHookFunction = {
@@ -42,6 +52,7 @@ type CompiledRoute = {
   cachePolicy: CompiledCachePolicy;
   upstreams: CompiledUpstream[];
   cors: CompiledCorsPolicy;
+  rateLimit: CompiledRateLimitPolicy;
   cursor: number;
   preHooks: CompiledHooks;
   postHooks: CompiledHooks;
@@ -79,6 +90,7 @@ export type RouteResolution = {
     logPolicyId: string | null;
     retentionTimeSeconds: number;
   };
+  rateLimit: CompiledRateLimitPolicy;
   preHooks: CompiledHooks;
   postHooks: CompiledHooks;
 };
@@ -176,6 +188,7 @@ export class CompiledWorkerConfig {
           logPolicyId: route.log.logPolicyId,
           retentionTimeSeconds: route.log.retentionTimeSeconds,
         },
+        rateLimit: route.rateLimit,
         preHooks: route.preHooks,
         postHooks: route.postHooks,
       };
@@ -284,6 +297,13 @@ export class CompiledWorkerConfig {
           cors: compileCorsPolicy(
             rule.corsPolicyId
               ? this.snapshot.corsPolicies.entities[rule.corsPolicyId]
+              : undefined,
+          ),
+          rateLimit: compileRateLimitPolicy(
+            rule.rateLimitPolicyId
+              ? this.snapshot.rateLimitPolicies?.entities[
+                  rule.rateLimitPolicyId
+                ]
               : undefined,
           ),
           preHooks: compileHooks(
@@ -505,6 +525,21 @@ function compileLogPolicy(
     enabled: policy?.enabled === true,
     logPolicyId: policy?.id ?? null,
     retentionTimeSeconds: policy?.retentionTimeSeconds ?? 0,
+  };
+}
+
+function compileRateLimitPolicy(
+  policy: RateLimitPolicy | undefined,
+): CompiledRateLimitPolicy {
+  const enabled =
+    policy?.enabled === true && policy.limit >= 1 && policy.windowSeconds >= 1;
+
+  return {
+    enabled,
+    rateLimitPolicyId: enabled ? policy.id : null,
+    limit: enabled ? policy.limit : 0,
+    windowSeconds: enabled ? policy.windowSeconds : 0,
+    keyType: policy?.keyType ?? 'ip',
   };
 }
 

@@ -22,16 +22,17 @@ Stand: Version 0.0.21
 |---|---|
 | **Domain Group** | Fachliche Klammer um eine Anwendung/Site. Fasst Hostnamen, Pfadregeln, Upstreams und Policies zusammen. |
 | **Domain** | Ein Hostname, der einer Domain Group zugeordnet ist. Anfragen an diesen Host werden nach den Regeln dieser Gruppe behandelt. |
-| **Path Rule** | Geordnete Regel innerhalb einer Domain Group: Pfadmuster → Upstream Group, optional mit Cache-, CORS-, Log-Policy und Pre-/Post-Hook. |
+| **Path Rule** | Geordnete Regel innerhalb einer Domain Group: Pfadmuster → Upstream Group, optional mit Cache-, CORS-, Log-, Rate-Limit-Policy und Pre-/Post-Hook. |
 | **Upstream Group** | Menge gleichwertiger Backends, auf die Anfragen verteilt werden. |
 | **Upstream** | Ein einzelnes Backend (Protokoll, Host, Port, Basispfad, TLS-Optionen). |
 | **Cache Policy** | Regeln für den `Cache-Control`-Header der Antwort (TTL-Grenzen). |
 | **CORS Policy** | Erlaubte Origins und Credentials-Verhalten für Cross-Origin-Anfragen. |
 | **Log Policy** | Legt fest, ob Anfragen einer Pfadregel protokolliert werden und wie lange. |
+| **Rate Limit Policy** | Begrenzt, wie viele Anfragen ein Client pro Zeitfenster an eine Pfadregel stellen darf. |
 | **Hook** | Verweis auf eine Funktion auf dem externen Function Server, die vor oder nach dem Upstream-Aufruf ausgeführt wird. |
 | **Request Log** | Protokolleintrag einer einzelnen Anfrage. |
 
-Cache-, CORS- und Log-Policies sowie Upstream Groups gehören jeweils zu einer Domain Group. Hooks sind
+Cache-, CORS-, Log- und Rate-Limit-Policies sowie Upstream Groups gehören jeweils zu einer Domain Group. Hooks sind
 global (nicht an eine Domain Group gebunden).
 
 ---
@@ -54,10 +55,10 @@ global (nicht an eine Domain Group gebunden).
 ### 2.3 Path Rules
 
 - **API-020** Path Rules können je Domain Group angelegt, gelistet, abgerufen, geändert und gelöscht werden.
-- **API-021** Eine Path Rule hat `name`, `path` (Pfadmuster), `order` (Reihenfolge), eine Upstream Group sowie optional Cache Policy, CORS Policy, Log Policy, Pre-Hook und Post-Hook.
+- **API-021** Eine Path Rule hat `name`, `path` (Pfadmuster), `order` (Reihenfolge), eine Upstream Group sowie optional Cache Policy, CORS Policy, Log Policy, Rate Limit Policy, Pre-Hook und Post-Hook.
 - **API-022** Path Rules werden aufsteigend nach `order` ausgeliefert und ausgewertet.
-- **API-023** Beim Zuordnen einer CORS- oder Log-Policy wird geprüft, dass diese existiert; andernfalls wird mit `404` abgelehnt.
-- **API-024** Optionale Zuordnungen (CORS, Log, Hooks) können durch `null` wieder entfernt werden.
+- **API-023** Beim Zuordnen einer CORS-, Log- oder Rate-Limit-Policy wird geprüft, dass diese in derselben Domain Group existiert; andernfalls wird mit `404` abgelehnt.
+- **API-024** Optionale Zuordnungen (CORS, Log, Rate Limit, Hooks) können durch `null` wieder entfernt werden.
 
 ### 2.4 Upstream Groups und Upstreams
 
@@ -72,6 +73,8 @@ global (nicht an eine Domain Group gebunden).
 - **API-041** Cache Policies speichern zusätzlich Cache-Tags (`enableCacheTags`, `cacheTagsHeader`), Cache-Varianten nach Cookies/Headern/Query-Parametern sowie Stale-while-error und Stale-while-revalidate. **Diese Felder werden derzeit nur gespeichert und vom Worker noch nicht ausgewertet.**
 - **API-042** CORS Policies können je Domain Group verwaltet werden (CRUD). Felder: `name`, `enabled` (Standard `false`), `allowCredentials` (Standard `false`), `allowedOrigins` (Liste, `*` erlaubt alle).
 - **API-043** Log Policies können je Domain Group verwaltet werden (CRUD). Felder: `name`, `enabled` (Standard `false`), `retentionTimeSeconds` (Standard 604800 = 7 Tage).
+- **API-044** Rate Limit Policies können je Domain Group verwaltet werden (CRUD, `v1/domain-groups/:domainGroupId/rate-limit-policies`). Felder: `name` (Pflicht), `enabled` (Standard `false`), `limit` (Pflicht, Anfragen pro Fenster), `windowSeconds` (Standard 60), `keyType` (wonach gezählt wird, Standard und derzeit einziger Wert `ip`). `limit` und `windowSeconds` müssen ganze Zahlen ≥ 1 sein, ein anderer `keyType` als `ip` wird abgelehnt (jeweils `400`).
+- **API-045** Wird eine Rate Limit Policy gelöscht, wird sie von allen Path Rules entfernt; diese sind danach unbegrenzt.
 
 ### 2.6 Hooks
 
@@ -163,15 +166,31 @@ global (nicht an eine Domain Group gebunden).
 - **WRK-064** Post-Hooks laufen nach dem Upstream-Aufruf und können die Antwort verändern. Schlägt ein Post-Hook fehl, wird die unveränderte Upstream-Antwort mit Header `x-error: post-hook failed` ausgeliefert.
 - **WRK-065** Ein einzelner Hook-Aufruf bricht nach 5 Sekunden ab (gilt als Fehler).
 - **WRK-066** Request-Bodies werden dem Hook je nach Content-Type als JSON-Objekt, Text oder Binärdaten (Base64) übergeben.
-- **WRK-067** Reihenfolge der Antwortverarbeitung: Post-Hook → CORS-Header → Cache-Header → Komprimierung.
+- **WRK-067** Reihenfolge der Verarbeitung: Routing → CORS-Prüfung → Rate Limit → Pre-Hook → Upstream → Post-Hook → CORS-Header → Cache-Header → Rate-Limit-Header → Komprimierung.
 
 ### 4.8 Request Logging
 
 - **WRK-070** Anfragen werden nur protokolliert, wenn der Path Rule eine Log Policy mit `enabled = true` zugeordnet ist.
-- **WRK-071** Protokolliert werden alle Ausgänge einer zugeordneten Anfrage: normale Antworten, CORS-Ablehnungen und -Preflights, Pre-Hook-Fehler, Short-Circuit-Antworten und Upstream-Fehler.
+- **WRK-071** Protokolliert werden alle Ausgänge einer zugeordneten Anfrage: normale Antworten, CORS-Ablehnungen und -Preflights, Rate-Limit-Ablehnungen (`429`), Pre-Hook-Fehler, Short-Circuit-Antworten und Upstream-Fehler.
 - **WRK-072** Logs werden an die API gesendet (API-060). Fehler beim Senden beeinträchtigen die Anfrage des Endnutzers nicht.
 
 ### 4.9 Betrieb und Beobachtbarkeit
 
 - **WRK-080** Optional exportiert der Worker OpenTelemetry-Traces (Konsole, OTLP/HTTP oder OTLP/gRPC) mit Spans für Routing, Hooks und Upstream-Aufruf; Trace-Kontext wird vom Client zum Upstream weitergegeben.
 - **WRK-081** Port, Control-Plane-URL, Worker-Token, Heartbeat-Intervall und Log-Ingest-URL werden über Umgebungsvariablen konfiguriert (siehe `apps/frontier-worker/README.md`).
+
+### 4.10 Rate Limiting
+
+- **WRK-090** Rate Limiting greift nur, wenn der Path Rule eine Rate Limit Policy mit `enabled = true` zugeordnet ist.
+- **WRK-091** Gezählt wird im Fixed-Window-Verfahren: Die Zeit ist in feste Fenster der Länge `windowSeconds` eingeteilt; pro Fenster sind `limit` Anfragen erlaubt, mit dem nächsten Fenster beginnt die Zählung neu. An Fenstergrenzen sind dadurch kurzzeitig bis zu 2 × `limit` Anfragen möglich.
+- **WRK-092** Gezählt wird je Path Rule, Policy und Client. Nutzen zwei Path Rules dieselbe Policy, hat jede ihr eigenes Kontingent.
+- **WRK-093** Der Client wird über seine IP-Adresse bestimmt (`keyType = ip`), standardmäßig die Adresse der TCP-Verbindung. Mit `rate_limit.trust_forwarded_for: true` in der Worker-Config wird stattdessen der erste Eintrag aus `X-Forwarded-For` verwendet. Das ist nur hinter einem vertrauenswürdigen Load Balancer sinnvoll, weil Clients den Header sonst fälschen können.
+- **WRK-094** Die Prüfung erfolgt nach der CORS-Prüfung und vor den Pre-Hooks. CORS-Preflights und wegen des Origins abgelehnte Anfragen zählen nicht.
+- **WRK-095** Wird das Limit überschritten, antwortet der Worker selbst mit `429`, ohne Pre-Hook und Upstream aufzurufen. Die Antwort enthält `Retry-After` (Sekunden bis zum Fensterende), `RateLimit-Limit`, `RateLimit-Remaining: 0`, `RateLimit-Reset` und bei erlaubtem Origin die CORS-Header, damit Browser-Anwendungen die Antwort lesen können.
+- **WRK-096** Erlaubte Antworten von Routen mit aktivem Rate Limit enthalten ebenfalls `RateLimit-Limit`, `RateLimit-Remaining` und `RateLimit-Reset`.
+- **WRK-097** Die Zählerstände liegen in einem Store, der in der Worker-Config (`rate_limit.store.type`) gewählt wird:
+  - `memory` (Standard): im Speicher des Workers. Jeder Worker zählt für sich; bei N Workern sind effektiv bis zu N × `limit` Anfragen möglich. Zählerstände gehen bei einem Neustart verloren.
+  - `redis`: gemeinsamer Zähler aller Worker in Redis.
+  - `postgres`: gemeinsamer Zähler aller Worker in Postgres/CockroachDB. Die Tabelle legt der Worker selbst an; abgelaufene Zähler werden regelmäßig gelöscht. Die Datenbank ist unabhängig von der der frontier-api.
+- **WRK-098** Ist der Store nicht erreichbar oder antwortet er nicht innerhalb von 250 ms, wird die Anfrage ohne Rate Limit durchgelassen (fail-open) und der Fehler geloggt (gedrosselt, höchstens alle 30 s).
+- **WRK-099** Eine ungültige `rate_limit`-Konfiguration (unbekannter Store-Typ, fehlende Pflichtangaben) verhindert den Start des Workers.

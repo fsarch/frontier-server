@@ -60,7 +60,7 @@ Both apps read YAML config from `config/config.yml`, copied from the committed `
 Configuration is organized around a `DomainGroup`:
 
 - `DomainGroup` has many `DomainGroupDomain` (hostnames routed to this group) and many `PathRule`s (ordered path-matching rules).
-- Each `PathRule` points at an `UpstreamGroup` (which has one or more `Upstream`s, load-balanced round-robin) and optionally at a `CachePolicy`, `CorsPolicy`, `LogPolicy`, and pre/post `Hook`s.
+- Each `PathRule` points at an `UpstreamGroup` (which has one or more `Upstream`s, load-balanced round-robin) and optionally at a `CachePolicy`, `CorsPolicy`, `LogPolicy`, `RateLimitPolicy`, and pre/post `Hook`s.
 - `Hook`s reference a `functionId` executed on a remote function server (OAuth2 client-credentials auth) — used to run custom pre/post request logic.
 
 Each of these entities follows the same three-file pattern under `apps/frontier-api/src/api/domain-group/**`: `*.controller.ts` (REST endpoints), `*.service.ts` (TypeORM repository access), `*.module.ts` (wiring). DB entities live in `apps/frontier-api/src/database/entities`, TypeORM migrations in `apps/frontier-api/src/database/migrations` and are registered in `apps/frontier-api/src/database/index.ts` (`DATABASE_OPTIONS`) — **new entities/migrations must be added there** or they won't be picked up.
@@ -75,13 +75,13 @@ Each of these entities follows the same three-file pattern under `apps/frontier-
 ### frontier-worker request pipeline
 
 1. `CompiledWorkerConfig` (`runtime/compiled-config.ts`) turns a raw `WorkerConfigSnapshot` into an efficient lookup structure: hostname → domain group → ordered path rules → round-robin upstream list. Path matching supports exact/prefix rules, catch-all (`*`), and suffix-wildcard (`*.ext`) patterns; `resolve(host, path)` is the hot-path route lookup called per request.
-2. `HttpProxyServer` (`runtime/http-proxy.server.ts`) is a raw Node `http` server (not Express/Nest) that, per request: resolves the route, handles CORS preflight/origin checks, runs pre-hooks (`FunctionClient`, can short-circuit with a response or rewrite the outgoing request), forwards to the upstream via `undici.fetch` (with an insecure-TLS dispatcher available per-upstream when `sslVerify` is disabled), decompresses gzip upstream responses, runs post-hooks, then applies the built-in CORS and cache-policy response hooks, then compresses the response for the client if `Accept-Encoding` allows it — finally reports the request log.
+2. `HttpProxyServer` (`runtime/http-proxy.server.ts`) is a raw Node `http` server (not Express/Nest) that, per request: resolves the route, handles CORS preflight/origin checks, applies the route's rate limit (`runtime/rate-limit/`, fixed window, fail-open; answers `429`), runs pre-hooks (`FunctionClient`, can short-circuit with a response or rewrite the outgoing request), forwards to the upstream via `undici.fetch` (with an insecure-TLS dispatcher available per-upstream when `sslVerify` is disabled), decompresses gzip upstream responses, runs post-hooks, then applies the built-in CORS and cache-policy response hooks, then compresses the response for the client if `Accept-Encoding` allows it — finally reports the request log.
 3. `FunctionClient` (`runtime/function-client.ts`) is the client for the external "function server" that executes hook logic remotely (OAuth2 client-credentials token, cached until near-expiry); pre/post hook payloads and results are validated against the shared `RequestType`/`ResponseType` shapes (`types/http/*.type.ts`) before being trusted.
 
 ### Config files
 
 - `apps/frontier-api/config/config.yml`: `uac` (static user/permission list), `auth` (JWT/JWK), `database` (Postgres/CockroachDB + optional SSL/CA), `workers.websocket` (auth token + poll interval), `remote-events`, `function_server`/`function_worker` (remote hook execution + OAuth2 creds).
-- `apps/frontier-worker/config/config.yml`: only `function_worker` (remote hook execution + OAuth2 creds) — everything else (port, control-plane URL, auth token, heartbeat interval) is environment-variable driven, see `apps/frontier-worker/README.md` for the full list and `scripts/start-local.zsh` for local defaults.
+- `apps/frontier-worker/config/config.yml`: `function_worker` (remote hook execution + OAuth2 creds) and `rate_limit` (counter store for rate limiting: `memory` | `redis` | `postgres`, plus `trust_forwarded_for`) — everything else (port, control-plane URL, auth token, heartbeat interval) is environment-variable driven, see `apps/frontier-worker/README.md` for the full list and `scripts/start-local.zsh` for local defaults.
 
 ## Docker
 

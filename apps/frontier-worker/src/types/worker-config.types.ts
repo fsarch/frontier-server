@@ -19,6 +19,7 @@ export type PathRule = {
   upstreamGroupId: string | null;
   corsPolicyId?: string | null;
   logPolicyId?: string | null;
+  rateLimitPolicyId?: string | null;
   preHookId?: string | null;
   postHookId?: string | null;
 };
@@ -90,6 +91,8 @@ export type WorkerConfigSnapshot = {
   logPolicies: EntityMap<LogPolicy>;
   upstreamGroups: EntityMap<UpstreamGroup>;
   hooks: EntityMap<Hook>;
+  // Optional so a worker keeps running against an older frontier-api that doesn't send it yet.
+  rateLimitPolicies?: EntityMap<RateLimitPolicy>;
 };
 
 export type LogPolicy = {
@@ -98,6 +101,18 @@ export type LogPolicy = {
   name: string;
   enabled: boolean;
   retentionTimeSeconds: number;
+};
+
+export type RateLimitKeyType = 'ip';
+
+export type RateLimitPolicy = {
+  id: string;
+  domainGroupId: string;
+  name: string;
+  enabled: boolean;
+  limit: number;
+  windowSeconds: number;
+  keyType: RateLimitKeyType;
 };
 
 export type BootstrapReply = {

@@ -5,6 +5,8 @@ import {
   HttpProxyServer,
   RequestLogPayload,
 } from './runtime/http-proxy.server.js';
+import { createRateLimitStore } from './runtime/rate-limit/create-rate-limit-store.js';
+import { RateLimiter } from './runtime/rate-limit/rate-limiter.js';
 import { shutdownTracing } from './tracing/tracing.js';
 
 const workerPort = parseInt(process.env.FRONTIER_WORKER_PORT ?? '8080', 10);
@@ -27,12 +29,19 @@ async function bootstrap() {
   );
 
   // Load function configurations
-  const functionConfigs = await loadWorkerConfig(configPath);
+  const { functionConfigs, rateLimit } = await loadWorkerConfig(configPath);
   console.log(
     `[worker] loaded function configs: worker=${functionConfigs.function_worker ? 'configured' : 'not configured'}`,
   );
 
   const functionClient = new FunctionClient(functionConfigs);
+
+  const rateLimiter = new RateLimiter(createRateLimitStore(rateLimit.store), {
+    trustForwardedFor: rateLimit.trust_forwarded_for,
+  });
+  console.log(
+    `[worker] rate limit store=${rateLimit.store.type} trustForwardedFor=${rateLimit.trust_forwarded_for}`,
+  );
 
   const proxyServer = new HttpProxyServer(workerPort, {
     onRequestLog: async (payload) => {
@@ -40,6 +49,7 @@ async function bootstrap() {
     },
     functionClient,
     functionConfigs,
+    rateLimiter,
   });
   await proxyServer.start();
 
@@ -60,6 +70,7 @@ async function bootstrap() {
   const shutdown = async () => {
     controlPlane.stop();
     await proxyServer.stop();
+    await rateLimiter.close();
     await shutdownTracing();
     process.exit(0);
   };

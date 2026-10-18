@@ -6,6 +6,7 @@ import { DomainModule } from '../../domain-group/domain/domain.module.js';
 import { DomainGroupModule } from '../../domain-group/domain-group.module.js';
 import { LogPolicyModule } from '../../domain-group/log-policy/log-policy.module.js';
 import { PathRuleModule } from '../../domain-group/path-rule/path-rule.module.js';
+import { RateLimitPolicyModule } from '../../domain-group/rate-limit-policy/rate-limit-policy.module.js';
 import { RequestLogModule } from '../../domain-group/request-log/request-log.module.js';
 import { UpstreamModule } from '../../domain-group/upstream-group/upstream/upstream.module.js';
 import { UpstreamGroupModule } from '../../domain-group/upstream-group/upstream-group.module.js';
@@ -29,6 +30,7 @@ import { WORKERS_CONFIG_VALIDATOR } from './workers-config.validator.js';
     UpstreamGroupModule,
     UpstreamModule,
     PathRuleModule,
+    RateLimitPolicyModule,
     HookModule,
     ModuleConfiguration.register('WORKERS_CONFIG', {
       name: 'workers',

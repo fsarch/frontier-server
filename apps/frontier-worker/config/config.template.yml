@@ -6,3 +6,28 @@ function_worker:
     token_endpoint: ''
     client_id: ''
     client_secret: ''
+
+# Rate limiting: where request counters are stored. Policies themselves are
+# managed in frontier-api and pushed with the config snapshot.
+rate_limit:
+  # true: count by the first X-Forwarded-For entry instead of the TCP peer
+  # address. Only enable behind a trusted load balancer - clients can forge it.
+  trust_forwarded_for: false
+  store:
+    # memory: per worker instance (N workers => up to N x limit)
+    type: 'memory'
+    # type: 'redis'
+    # url: 'redis://localhost:6379'
+    # key_prefix: 'frontier:rl:'
+    #
+    # type: 'postgres'
+    # host: 'localhost'
+    # port: 5432
+    # username: 'postgres'
+    # password: 'postgres'
+    # database: 'frontier_rate_limit'
+    # table: 'frontier_rate_limit_counter'
+    # ssl:
+    #   rejectUnauthorized: true
+    #   ca:
+    #     path: ./config/certs/ca.crt

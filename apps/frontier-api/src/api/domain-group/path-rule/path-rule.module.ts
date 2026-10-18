@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CorsPolicy } from '../../../database/entities/cors-policy.entity.js';
 import { LogPolicy } from '../../../database/entities/log-policy.entity.js';
 import { PathRule } from '../../../database/entities/path-rule.entity.js';
+import { RateLimitPolicy } from '../../../database/entities/rate-limit-policy.entity.js';
 import { PathRuleController } from './path-rule.controller.js';
 import { PathRuleService } from './path-rule.service.js';
 
@@ -10,6 +11,13 @@ import { PathRuleService } from './path-rule.service.js';
   providers: [PathRuleService],
   exports: [PathRuleService],
   controllers: [PathRuleController],
-  imports: [TypeOrmModule.forFeature([PathRule, CorsPolicy, LogPolicy])],
+  imports: [
+    TypeOrmModule.forFeature([
+      PathRule,
+      CorsPolicy,
+      LogPolicy,
+      RateLimitPolicy,
+    ]),
+  ],
 })
 export class PathRuleModule {}

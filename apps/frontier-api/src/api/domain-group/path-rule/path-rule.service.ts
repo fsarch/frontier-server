@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { CorsPolicy } from '../../../database/entities/cors-policy.entity.js';
 import { LogPolicy } from '../../../database/entities/log-policy.entity.js';
 import { PathRule } from '../../../database/entities/path-rule.entity.js';
+import { RateLimitPolicy } from '../../../database/entities/rate-limit-policy.entity.js';
 import {
   PathRuleCreateDto,
   PathRuleUpdateDto,
@@ -18,11 +19,17 @@ export class PathRuleService {
     private readonly corsPolicyRepository: Repository<CorsPolicy>,
     @InjectRepository(LogPolicy)
     private readonly logPolicyRepository: Repository<LogPolicy>,
+    @InjectRepository(RateLimitPolicy)
+    private readonly rateLimitPolicyRepository: Repository<RateLimitPolicy>,
   ) {}
 
   public async Create(domainGroupId: string, pathRuleDto: PathRuleCreateDto) {
     await this.ensureCorsPolicyExists(domainGroupId, pathRuleDto.corsPolicyId);
     await this.ensureLogPolicyExists(domainGroupId, pathRuleDto.logPolicyId);
+    await this.ensureRateLimitPolicyExists(
+      domainGroupId,
+      pathRuleDto.rateLimitPolicyId,
+    );
 
     const createdPathRule = this.pathRuleRepository.create({
       id: crypto.randomUUID(),
@@ -74,6 +81,10 @@ export class PathRuleService {
     const pathRule = await this.GetById(domainGroupId, id);
     await this.ensureCorsPolicyExists(domainGroupId, dto.corsPolicyId);
     await this.ensureLogPolicyExists(domainGroupId, dto.logPolicyId);
+    await this.ensureRateLimitPolicyExists(
+      domainGroupId,
+      dto.rateLimitPolicyId,
+    );
 
     Object.assign(pathRule, dto);
 
@@ -122,6 +133,28 @@ export class PathRuleService {
 
     if (!logPolicy) {
       throw new NotFoundException(`LogPolicy ${logPolicyId} not found`);
+    }
+  }
+
+  private async ensureRateLimitPolicyExists(
+    domainGroupId: string,
+    rateLimitPolicyId: string | null | undefined,
+  ): Promise<void> {
+    if (!rateLimitPolicyId) {
+      return;
+    }
+
+    const rateLimitPolicy = await this.rateLimitPolicyRepository.findOne({
+      where: {
+        id: rateLimitPolicyId,
+        domainGroupId,
+      },
+    });
+
+    if (!rateLimitPolicy) {
+      throw new NotFoundException(
+        `RateLimitPolicy ${rateLimitPolicyId} not found`,
+      );
     }
   }
 }

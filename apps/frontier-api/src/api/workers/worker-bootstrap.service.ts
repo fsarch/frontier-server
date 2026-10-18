@@ -8,6 +8,7 @@ import { DomainGroupDomain } from '../../database/entities/domain-group-domain.e
 import { Hook } from '../../database/entities/hook.entity.js';
 import { LogPolicy } from '../../database/entities/log-policy.entity.js';
 import { PathRule } from '../../database/entities/path-rule.entity.js';
+import { RateLimitPolicy } from '../../database/entities/rate-limit-policy.entity.js';
 import { Upstream } from '../../database/entities/upstream.entity.js';
 import { UpstreamGroup } from '../../database/entities/upstream-group.entity.js';
 import { CachePolicyService } from '../domain-group/cache-policy/cache-policy.service.js';
@@ -16,6 +17,7 @@ import { DomainService } from '../domain-group/domain/domain.service.js';
 import { DomainGroupService } from '../domain-group/domain-group.service.js';
 import { LogPolicyService } from '../domain-group/log-policy/log-policy.service.js';
 import { PathRuleService } from '../domain-group/path-rule/path-rule.service.js';
+import { RateLimitPolicyService } from '../domain-group/rate-limit-policy/rate-limit-policy.service.js';
 import { UpstreamService } from '../domain-group/upstream-group/upstream/upstream.service.js';
 import { UpstreamGroupService } from '../domain-group/upstream-group/upstream-group.service.js';
 import { HookService } from '../hooks/hook.service.js';
@@ -31,6 +33,7 @@ export type WorkerConfigSnapshot = {
   cachePolicies: TEntity<CachePolicy>;
   corsPolicies: TEntity<CorsPolicy>;
   logPolicies: TEntity<LogPolicy>;
+  rateLimitPolicies: TEntity<RateLimitPolicy>;
   hooks: TEntity<Hook>;
   upstreamGroups: TEntity<UpstreamGroup & { upstreams: Array<Upstream> }>;
 };
@@ -79,6 +82,7 @@ export class WorkerBootstrapService {
     private readonly upstreamService: UpstreamService,
     private readonly pathRuleService: PathRuleService,
     private readonly hookService: HookService,
+    private readonly rateLimitPolicyService: RateLimitPolicyService,
   ) {}
 
   /**
@@ -97,6 +101,7 @@ export class WorkerBootstrapService {
       upstreams,
       pathRules,
       hooks,
+      rateLimitPolicies,
     ] = await Promise.all([
       this.domainGroupService.List(),
       this.domainService.List(),
@@ -107,6 +112,7 @@ export class WorkerBootstrapService {
       this.upstreamService.List(),
       this.pathRuleService.List(),
       this.hookService.List(),
+      this.rateLimitPolicyService.List(),
     ]);
 
     const upstreamGroupsEntity = toEntityGroup(
@@ -151,6 +157,10 @@ export class WorkerBootstrapService {
       ),
       corsPolicies: toEntityGroup(corsPolicies, (corsPolicy) => corsPolicy.id),
       logPolicies: toEntityGroup(logPolicies, (logPolicy) => logPolicy.id),
+      rateLimitPolicies: toEntityGroup(
+        rateLimitPolicies,
+        (rateLimitPolicy) => rateLimitPolicy.id,
+      ),
       hooks: toEntityGroup(hooks, (hook) => hook.id),
       upstreamGroups: upstreamGroupsEntity,
     };

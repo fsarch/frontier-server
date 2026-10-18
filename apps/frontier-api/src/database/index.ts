@@ -5,6 +5,7 @@ import { DomainGroupDomain } from './entities/domain-group-domain.entity.js';
 import { Hook } from './entities/hook.entity.js';
 import { LogPolicy } from './entities/log-policy.entity.js';
 import { PathRule } from './entities/path-rule.entity.js';
+import { RateLimitPolicy } from './entities/rate-limit-policy.entity.js';
 import { RequestLog } from './entities/request-log.entity.js';
 import { Upstream } from './entities/upstream.entity.js';
 import { UpstreamGroup } from './entities/upstream-group.entity.js';
@@ -14,6 +15,7 @@ import { AddCorsPolicyTable1777326431513 } from './migrations/1777326431513-add-
 import { AddLogPolicyAndRequestLog1777413549156 } from './migrations/1777413549156-add-log-policy-and-request-log.js';
 import { AddHookTableAndPathRuleHookIds1782845914875 } from './migrations/1782845914875-add-hook-table-and-path-rule-hook-ids.js';
 import { AddUpstreamProtocolAndSslOptions1783521000000 } from './migrations/1783521000000-add-upstream-protocol-and-ssl-verify.js';
+import { AddRateLimitPolicy1784000000000 } from './migrations/1784000000000-add-rate-limit-policy.js';
 
 export const DATABASE_OPTIONS = {
   entities: [
@@ -24,6 +26,7 @@ export const DATABASE_OPTIONS = {
     Hook,
     LogPolicy,
     PathRule,
+    RateLimitPolicy,
     RequestLog,
     Upstream,
     UpstreamSslOptions,
@@ -35,5 +38,6 @@ export const DATABASE_OPTIONS = {
     AddLogPolicyAndRequestLog1777413549156,
     AddHookTableAndPathRuleHookIds1782845914875,
     AddUpstreamProtocolAndSslOptions1783521000000,
+    AddRateLimitPolicy1784000000000,
   ],
 };
