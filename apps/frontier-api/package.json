@@ -6,6 +6,15 @@
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/lib/index.js",
+      "types": "./dist/lib/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "fsarch-server build",
     "build:watch": "tsc -p tsconfig.json --watch",
@@ -21,7 +30,7 @@
     "test:e2e": "vitest run --config ./vitest.e2e.config.ts"
   },
   "dependencies": {
-    "@fsarch/server": "^0.5.1",
+    "@fsarch/server": "^0.5.2",
     "@nestjs/common": "^12.1.0",
     "@nestjs/config": "^12.0.1",
     "@nestjs/core": "^12.1.0",

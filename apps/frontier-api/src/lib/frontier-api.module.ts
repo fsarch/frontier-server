@@ -1,6 +1,5 @@
 import { createServiceModule } from '@fsarch/server';
 import { ModuleConfiguration } from '@fsarch/server/configuration';
-import { ScheduleModule } from '@nestjs/schedule';
 import { CachePolicy } from '../database/entities/cache-policy.entity.js';
 import { CorsPolicy } from '../database/entities/cors-policy.entity.js';
 import { DomainGroup } from '../database/entities/domain-group.entity.js';
@@ -53,13 +52,26 @@ import { WORKERS_CONFIG_VALIDATOR } from '../api/workers/websocket/workers-confi
  * nested module doing its own separate `forFeature()` would still bind to
  * the *default* connection, which doesn't exist in a mono-service mount.
  *
- * `ScheduleModule.forRoot()` (needed by `RequestLogService`'s `@Cron()`
- * cleanup job) moves here from the old root `FrontierApiModule`, since that
- * wrapper module disappears. `ModuleConfiguration.register('WORKERS_CONFIG',
- * ...)` keeps its existing `name: 'workers'` config-section lookup, now
- * threaded through the generated module's `connectionName` as `serviceId`
- * so a mono-service mount reads its own `services[].config.workers` entry
- * instead of the flat root `workers:` section.
+ * The old root `FrontierApiModule`'s own `ScheduleModule.forRoot()` (for
+ * `RequestLogService`'s `@Cron()` cleanup job) is dropped (not carried
+ * forward here) - `@nestjs/schedule`'s cron scanning is process-wide via
+ * `DiscoveryModule` regardless of which module imported `ScheduleModule`,
+ * and `@fsarch/server`'s `FsarchModule` already registers
+ * `ScheduleModule.forRoot()` globally once per process, so `@Cron()` is
+ * picked up without a second registration here. A second registration is
+ * redundant at best - and, mounted alongside other services via
+ * `FsArchAppBuilder.addService()`, a second `global: true` dynamic-module
+ * registration of the same shared `ScheduleModule` class is exactly the
+ * pattern that was found (for `@nestjs/config`'s `ConfigModule`, in
+ * `image-server`) to corrupt Nest's module-token bookkeeping for every
+ * other concurrently mounted service's own `AuthModule.register(id)` - see
+ * `@fsarch/server`'s mono-service harness notes.
+ *
+ * `ModuleConfiguration.register('WORKERS_CONFIG', ...)` keeps its existing
+ * `name: 'workers'` config-section lookup, now threaded through the
+ * generated module's `connectionName` as `serviceId` so a mono-service
+ * mount reads its own `services[].config.workers` entry instead of the flat
+ * root `workers:` section.
  */
 export const FrontierApiModule = createServiceModule({
   entities: [
@@ -107,7 +119,6 @@ export const FrontierApiModule = createServiceModule({
     WorkerBootstrapService,
   ],
   imports: (serviceId) => [
-    ScheduleModule.forRoot(),
     ModuleConfiguration.register('WORKERS_CONFIG', {
       name: 'workers',
       validationSchema: WORKERS_CONFIG_VALIDATOR,
