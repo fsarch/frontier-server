@@ -1,0 +1,46 @@
+name: publish package
+
+# Publishes the service's library build (dist/lib, export `descriptor`) as
+# @fsarch/<name> to GitHub Packages, so aio-server can depend on a version
+# instead of a local file: link. Same trigger as image.yml's release path:
+# pushing a v* tag. The version is taken from the tag, not package.json.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontier-api
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v6
+      - name: enable corepack
+        run: corepack enable
+      - name: setup node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      # Deliberately no registry-url above: setup-node would point the whole
+      # default registry at npm.pkg.github.com for the install too. Only the
+      # publish goes there (via publishConfig.registry in package.json).
+      - name: install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: build
+        run: pnpm run build
+      - name: set version from tag
+        run: npm pkg set version="${GITHUB_REF_NAME#v}"
+      - name: publish
+        run: |
+          npm config set //npm.pkg.github.com/:_authToken "${NODE_AUTH_TOKEN}"
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
