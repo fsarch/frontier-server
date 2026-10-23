@@ -93,5 +93,5 @@ Trace context propagates across the control-plane/data-plane boundary (W3C
 ## Notes
 
 - The API exposes Swagger docs at `/docs` when running.
-- The worker currently connects to the API websocket endpoint at `ws://localhost:3000/api/workers/websocket`.
+- The worker is pointed at frontier-api's base URL (`FRONTIER_API_URL`, default `http://localhost:3000`) and connects to its websocket endpoint `<base>/api/workers/websocket`.
 

@@ -1,4 +1,5 @@
 import { ControlPlaneClient } from './control-plane/control-plane.client.js';
+import { resolveControlPlaneUrls } from './control-plane/control-plane-urls.js';
 import { loadWorkerConfig } from './runtime/config-loader.js';
 import { FunctionClient } from './runtime/function-client.js';
 import {
@@ -10,22 +11,18 @@ import { RateLimiter } from './runtime/rate-limit/rate-limiter.js';
 import { shutdownTracing } from './tracing/tracing.js';
 
 const workerPort = parseInt(process.env.FRONTIER_WORKER_PORT ?? '8080', 10);
-const controlPlaneUrl =
-  process.env.FRONTIER_CONTROL_PLANE_URL ??
-  'ws://localhost:3000/api/workers/websocket';
+const { websocketUrl: controlPlaneUrl, logIngestUrl: workerLogIngestUrl } =
+  resolveControlPlaneUrls(process.env);
 const workerAuthToken = process.env.FRONTIER_WORKER_AUTH_TOKEN ?? 'Test';
 const heartbeatIntervalMs = parseInt(
   process.env.FRONTIER_WORKER_HEARTBEAT_MS ?? '10000',
   10,
 );
-const workerLogIngestUrl =
-  process.env.FRONTIER_WORKER_LOG_INGEST_URL ??
-  deriveWorkerLogIngestUrl(controlPlaneUrl);
 const configPath = process.env.FRONTIER_WORKER_CONFIG_PATH;
 
 async function bootstrap() {
   console.log(
-    `[worker] initializing worker auth=${process.env.FRONTIER_WORKER_AUTH_TOKEN ? 'env' : 'default'} logIngestUrl=${workerLogIngestUrl}`,
+    `[worker] initializing worker auth=${process.env.FRONTIER_WORKER_AUTH_TOKEN ? 'env' : 'default'} controlPlaneUrl=${controlPlaneUrl} logIngestUrl=${workerLogIngestUrl}`,
   );
 
   // Load function configurations
@@ -109,21 +106,4 @@ async function postRequestLog(payload: RequestLogPayload): Promise<void> {
       `log ingest failed status=${response.status}${errorDetails} url=${workerLogIngestUrl}`,
     );
   }
-}
-
-function deriveWorkerLogIngestUrl(websocketUrl: string): string {
-  const parsed = new URL(websocketUrl);
-
-  if (parsed.protocol === 'ws:') {
-    parsed.protocol = 'http:';
-  }
-
-  if (parsed.protocol === 'wss:') {
-    parsed.protocol = 'https:';
-  }
-
-  parsed.pathname = '/api/workers/logs';
-  parsed.search = '';
-
-  return parsed.toString();
 }

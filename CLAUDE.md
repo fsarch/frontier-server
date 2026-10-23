@@ -49,7 +49,7 @@ npx vitest run src/runtime/compiled-config.spec.ts --config apps/frontier-worker
 
 (or `cd apps/<app> && npx vitest run <path-to-spec>`).
 
-For local end-to-end development, start `frontier-api` first — `frontier-worker` needs the websocket endpoint (`ws://localhost:3000/api/workers/websocket` by default) available to bootstrap.
+For local end-to-end development, start `frontier-api` first — `frontier-worker` needs the websocket endpoint available to bootstrap. The worker only gets frontier-api's base URL (`FRONTIER_API_URL`, default `http://localhost:3000`) and derives `<base>/api/workers/websocket` and `<base>/api/workers/logs` from it (`src/control-plane/control-plane-urls.ts`); the base may carry a path prefix (frontier-api mounted in aio-server).
 
 Both apps read YAML config from `config/config.yml`, copied from the committed `config/config.template.yml` (gitignored once created).
 

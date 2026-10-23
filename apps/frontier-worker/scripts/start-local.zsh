@@ -16,13 +16,13 @@ debug_log() {
 }
 
 export FRONTIER_WORKER_PORT="${FRONTIER_WORKER_PORT:-8080}"
-export FRONTIER_CONTROL_PLANE_URL="${FRONTIER_CONTROL_PLANE_URL:-ws://localhost:8081/api/workers/websocket}"
+export FRONTIER_API_URL="${FRONTIER_API_URL:-http://localhost:8081}"
 export FRONTIER_WORKER_AUTH_TOKEN="${FRONTIER_WORKER_AUTH_TOKEN:-Test}"
 export FRONTIER_WORKER_HEARTBEAT_MS="${FRONTIER_WORKER_HEARTBEAT_MS:-10000}"
 export FRONTIER_WORKER_DEBUG="${FRONTIER_WORKER_DEBUG:-true}"
 
 echo "[worker-local] FRONTIER_WORKER_PORT=$FRONTIER_WORKER_PORT"
-echo "[worker-local] FRONTIER_CONTROL_PLANE_URL=$FRONTIER_CONTROL_PLANE_URL"
+echo "[worker-local] FRONTIER_API_URL=$FRONTIER_API_URL"
 echo "[worker-local] FRONTIER_WORKER_AUTH_TOKEN=<redacted>"
 echo "[worker-local] FRONTIER_WORKER_HEARTBEAT_MS=$FRONTIER_WORKER_HEARTBEAT_MS"
 echo "[worker-local] FRONTIER_WORKER_DEBUG=$FRONTIER_WORKER_DEBUG"
@@ -34,8 +34,8 @@ if [[ -n "${PORT:-}" ]]; then
   debug_log "PORT is set to '$PORT' (used by API, not by worker data-plane)"
 fi
 
-if [[ "$FRONTIER_CONTROL_PLANE_URL" != ws://* && "$FRONTIER_CONTROL_PLANE_URL" != wss://* ]]; then
-  echo "[worker-local][warn] FRONTIER_CONTROL_PLANE_URL does not look like a websocket URL: $FRONTIER_CONTROL_PLANE_URL"
+if [[ "$FRONTIER_API_URL" != http://* && "$FRONTIER_API_URL" != https://* ]]; then
+  echo "[worker-local][warn] FRONTIER_API_URL does not look like an http(s) base URL: $FRONTIER_API_URL"
 fi
 
 if command -v lsof >/dev/null 2>&1; then
@@ -51,7 +51,7 @@ if command -v curl >/dev/null 2>&1; then
   if curl -sS --max-time 1 "$local_api_http" >/dev/null 2>&1; then
 	debug_log "local API endpoint reachable at $local_api_http"
   else
-	echo "[worker-local][warn] local API endpoint not reachable at $local_api_http (control-plane URL: $FRONTIER_CONTROL_PLANE_URL)"
+	echo "[worker-local][warn] local API endpoint not reachable at $local_api_http (FRONTIER_API_URL: $FRONTIER_API_URL)"
   fi
 fi
 

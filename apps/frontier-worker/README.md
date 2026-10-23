@@ -25,7 +25,8 @@ The worker runtime follows a split control/data-plane approach:
 ## Worker Environment
 
 - `FRONTIER_WORKER_PORT` (default `8080`) - data-plane HTTP ingress
-- `FRONTIER_CONTROL_PLANE_URL` (default `ws://localhost:3000/api/workers/websocket`)
+- `FRONTIER_API_URL` (default `http://localhost:3000`) - base URL of frontier-api; the worker connects to `<base>/api/workers/websocket` (`http`→`ws`, `https`→`wss`) and posts request logs to `<base>/api/workers/logs`. May include a path, e.g. `http://aio-server/frontier` when frontier-api is mounted under a prefix
+- `FRONTIER_CONTROL_PLANE_URL` / `FRONTIER_WORKER_LOG_INGEST_URL` (deprecated, optional) - full websocket / log ingest URLs; override what `FRONTIER_API_URL` derives
 - `FRONTIER_WORKER_AUTH_TOKEN` (default `Test`)
 - `FRONTIER_WORKER_HEARTBEAT_MS` (default `10000`)
 - `FRONTIER_WORKER_TRACING_ENABLED` (default `false`) - enables OpenTelemetry tracing
@@ -107,7 +108,7 @@ pnpm --filter ./apps/frontier-worker run start:local
 `start:local` sets local defaults for:
 
 - `FRONTIER_WORKER_PORT=8080`
-- `FRONTIER_CONTROL_PLANE_URL=ws://localhost:3000/api/workers/websocket`
+- `FRONTIER_API_URL=http://localhost:8081`
 - `FRONTIER_WORKER_AUTH_TOKEN=Test`
 - `FRONTIER_WORKER_HEARTBEAT_MS=10000`
 
